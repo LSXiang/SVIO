@@ -346,7 +346,7 @@ double DepthFilter::computeTau(
   double beta_plus = beta + px_error_angle;
   double gamma_plus = PI-alpha-beta_plus; // triangle angles sum to PI
   double z_plus = t_norm*sin(beta_plus)/sin(gamma_plus); // law of sines
-  return (z_plus - z); // tau
+  return (z_plus / f.norm() - z); // tau
 }
 
 } // namespace svo
