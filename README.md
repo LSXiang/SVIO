@@ -1,3 +1,8 @@
+SVIO
+===
+This code will annotate, streamline, and add inertial sensor models based on SVO.
+
+===
 SVO
 ===
 
