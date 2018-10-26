@@ -2,8 +2,8 @@
 # user build settings
 
 SET(TRACE TRUE)
-SET(HAVE_G2O TRUE)# FALSE) 
-SET(USE_ROS TRUE) # Set FALSE if you want to build this package without Catkin
+SET(HAVE_G2O TRUE)  # (TRUE or FALSE) 
+SET(USE_ROS TRUE)   # Set FALSE if you want to build this package without Catkin
 SET(DEBUG_OUTPUT FALSE) # Only relevant if build without ROS
 
 ################################################################################
@@ -48,13 +48,13 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Eigen REQUIRED)
 FIND_PACKAGE(Sophus REQUIRED)
-FIND_PACKAGE(fast REQUIRED)
+# FIND_PACKAGE(fast REQUIRED)
 FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system)
 
 IF(USE_ROS)
   FIND_PACKAGE(catkin REQUIRED COMPONENTS roscpp roslib cmake_modules vikit_common vikit_ros)
   catkin_package(
-      DEPENDS Eigen OpenCV Sophus Boost fast
+      DEPENDS Eigen OpenCV Sophus Boost
       CATKIN_DEPENDS roscpp roslib vikit_common vikit_ros
       INCLUDE_DIRS include
       LIBRARIES svo
@@ -72,15 +72,17 @@ INCLUDE_DIRECTORIES(
   ${OpenCV_INCLUDE_DIRS}
   ${Sophus_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-  ${fast_INCLUDE_DIRS}
 )
+
+# add fast library
+add_subdirectory(src/fast)
 
 # Set link libraries
 LIST(APPEND LINK_LIBS 
   ${OpenCV_LIBS}
   ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${fast_LIBRARIES}
+  fast_LIBRARIES
 )
 
 IF(USE_ROS)
@@ -149,3 +151,6 @@ TARGET_LINK_LIBRARIES(test_sparse_img_align svo)
 
 ADD_EXECUTABLE(test_pose_optimizer test/test_pose_optimizer.cpp)
 TARGET_LINK_LIBRARIES(test_pose_optimizer svo) 
+
+ADD_EXECUTABLE(test_fast_detect test/test_fast_detect.cpp)
+TARGET_LINK_LIBRARIES(test_fast_detect ${OpenCV_LIBS} fast_LIBRARIES)
