@@ -63,7 +63,8 @@ DepthFilter::~DepthFilter()
 
 void DepthFilter::startThread()
 {
-  thread_ = new boost::thread(&DepthFilter::updateSeedsLoop, this);
+    // create a thread perallel update seed
+    thread_ = new boost::thread(&DepthFilter::updateSeedsLoop, this);
 }
 
 void DepthFilter::stopThread()

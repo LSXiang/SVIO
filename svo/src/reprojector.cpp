@@ -43,25 +43,25 @@ Reprojector::~Reprojector()
 
 void Reprojector::initializeGrid(vk::AbstractCamera* cam)
 {
-  grid_.cell_size = Config::gridSize();     // default: 30
-  grid_.grid_n_cols = ceil(static_cast<double>(cam->width())/grid_.cell_size);
-  grid_.grid_n_rows = ceil(static_cast<double>(cam->height())/grid_.cell_size);
-  grid_.cells.resize(grid_.grid_n_cols*grid_.grid_n_rows);
+    grid_.cell_size = Config::gridSize();     // default: 30
+    grid_.grid_n_cols = ceil(static_cast<double>(cam->width())/grid_.cell_size);
+    grid_.grid_n_rows = ceil(static_cast<double>(cam->height())/grid_.cell_size);
+    grid_.cells.resize(grid_.grid_n_cols*grid_.grid_n_rows);
   
-  /**
-   * The std::for_each can refer to https://en.cppreference.com/w/cpp/algorithm/for_each
-   * this program is same to :
-   *    auto f = [&](Cell* & c){ c = new Cell; }
-   *    std::for_each(grid_.cells.begin(), grid_cells.end(), f);
-   * where '&' is reference, the type of cells member is Cell*
-   */
-  std::for_each(grid_.cells.begin(), grid_.cells.end(), [&](Cell*& c){ c = new Cell; });
-  
-  grid_.cell_order.resize(grid_.cells.size());
-  for(size_t i=0; i<grid_.cells.size(); ++i)
-    grid_.cell_order[i] = i;
-  
-  random_shuffle(grid_.cell_order.begin(), grid_.cell_order.end()); // maybe we should do it at every iteration!
+    /**
+    * The std::for_each can refer to https://en.cppreference.com/w/cpp/algorithm/for_each
+    * this program is same to :
+    *    auto f = [&](Cell* & c){ c = new Cell; }
+    *    std::for_each(grid_.cells.begin(), grid_cells.end(), f);
+    * where '&' is reference, the type of cells member is Cell*
+    */
+    std::for_each(grid_.cells.begin(), grid_.cells.end(), [&](Cell*& c){ c = new Cell; });
+
+    grid_.cell_order.resize(grid_.cells.size());
+    for(size_t i=0; i<grid_.cells.size(); ++i)
+        grid_.cell_order[i] = i;
+
+    random_shuffle(grid_.cell_order.begin(), grid_.cell_order.end()); // maybe we should do it at every iteration!
 }
 
 void Reprojector::resetGrid()

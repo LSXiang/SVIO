@@ -31,28 +31,35 @@
 namespace svo {
 
 FrameHandlerMono::FrameHandlerMono(vk::AbstractCamera* cam) :
-  FrameHandlerBase(),
-  cam_(cam),
-  reprojector_(cam_, map_),
-  depth_filter_(NULL)
+    FrameHandlerBase(),
+    cam_(cam),
+    reprojector_(cam_, map_),
+    depth_filter_(NULL)
 {
-  initialize();
+    initialize();
 }
 
 void FrameHandlerMono::initialize()
 {
-  feature_detection::DetectorPtr feature_detector(
-      new feature_detection::FastDetector(
-          cam_->width(), cam_->height(), Config::gridSize(), Config::nPyrLevels()));
-  DepthFilter::callback_t depth_filter_cb = boost::bind(
-      &MapPointCandidates::newCandidatePoint, &map_.point_candidates_, _1, _2);
-  depth_filter_ = new DepthFilter(feature_detector, depth_filter_cb);
-  depth_filter_->startThread();
+    // create a fast feature detector use to feature point track
+    feature_detection::DetectorPtr feature_detector(
+        new feature_detection::FastDetector(
+            cam_->width(), cam_->height(), Config::gridSize(), Config::nPyrLevels()));
+    
+    /**
+     * boost::bind refer to https://www.boost.org/doc/libs/1_68_0/libs/bind/doc/html/bind.html
+     * using bind with pointers to members:
+     *      depth_filter_cb(_1, _2) => (&map_.point_candidates_)->newCandidatePoint(_1, _2)
+     */
+    DepthFilter::callback_t depth_filter_cb = boost::bind(
+        &MapPointCandidates::newCandidatePoint, &map_.point_candidates_, _1, _2);
+    depth_filter_ = new DepthFilter(feature_detector, depth_filter_cb);
+    depth_filter_->startThread();
 }
 
 FrameHandlerMono::~FrameHandlerMono()
 {
-  delete depth_filter_;
+    delete depth_filter_;
 }
 
 void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
