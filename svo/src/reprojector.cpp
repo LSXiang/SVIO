@@ -49,12 +49,12 @@ void Reprojector::initializeGrid(vk::AbstractCamera* cam)
     grid_.cells.resize(grid_.grid_n_cols*grid_.grid_n_rows);
   
     /**
-    * The std::for_each can refer to https://en.cppreference.com/w/cpp/algorithm/for_each
-    * this program is same to :
-    *    auto f = [&](Cell* & c){ c = new Cell; }
-    *    std::for_each(grid_.cells.begin(), grid_cells.end(), f);
-    * where '&' is reference, the type of cells member is Cell*
-    */
+     * The std::for_each can refer to https://en.cppreference.com/w/cpp/algorithm/for_each
+     * this program is same to :
+     *    auto f = [&](Cell* & c){ c = new Cell; }
+     *    std::for_each(grid_.cells.begin(), grid_cells.end(), f);
+     * where '&' is reference, the type of cells member is Cell*
+     */
     std::for_each(grid_.cells.begin(), grid_.cells.end(), [&](Cell*& c){ c = new Cell; });
 
     grid_.cell_order.resize(grid_.cells.size());

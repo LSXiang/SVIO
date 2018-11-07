@@ -28,16 +28,16 @@ namespace initialization {
 
 InitResult KltHomographyInit::addFirstFrame(FramePtr frame_ref)
 {
-  reset();
-  detectFeatures(frame_ref, px_ref_, f_ref_);
-  if(px_ref_.size() < 100)
-  {
-    SVO_WARN_STREAM_THROTTLE(2.0, "First image has less than 100 features. Retry in more textured environment.");
-    return FAILURE;
-  }
-  frame_ref_ = frame_ref;
-  px_cur_.insert(px_cur_.begin(), px_ref_.begin(), px_ref_.end());
-  return SUCCESS;
+    reset();
+    detectFeatures(frame_ref, px_ref_, f_ref_);
+    if(px_ref_.size() < 100)
+    {
+        SVO_WARN_STREAM_THROTTLE(2.0, "First image has less than 100 features. Retry in more textured environment.");
+        return FAILURE;
+    }
+    frame_ref_ = frame_ref;
+    px_cur_.insert(px_cur_.begin(), px_ref_.begin(), px_ref_.end());
+    return SUCCESS;
 }
 
 InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur)
@@ -100,8 +100,8 @@ InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur)
 
 void KltHomographyInit::reset()
 {
-  px_cur_.clear();
-  frame_ref_.reset();
+    px_cur_.clear();
+    frame_ref_.reset();
 }
 
 void detectFeatures(
@@ -109,19 +109,19 @@ void detectFeatures(
     vector<cv::Point2f>& px_vec,
     vector<Vector3d>& f_vec)
 {
-  Features new_features;
-  feature_detection::FastDetector detector(
-      frame->img().cols, frame->img().rows, Config::gridSize(), Config::nPyrLevels());
-  detector.detect(frame.get(), frame->img_pyr_, Config::triangMinCornerScore(), new_features);
+    Features new_features;
+    feature_detection::FastDetector detector(
+        frame->img().cols, frame->img().rows, Config::gridSize(), Config::nPyrLevels());
+    detector.detect(frame.get(), frame->img_pyr_, Config::triangMinCornerScore(), new_features);
 
-  // now for all maximum corners, initialize a new seed
-  px_vec.clear(); px_vec.reserve(new_features.size());
-  f_vec.clear(); f_vec.reserve(new_features.size());
-  std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
-    px_vec.push_back(cv::Point2f(ftr->px[0], ftr->px[1]));
-    f_vec.push_back(ftr->f);
-    delete ftr;
-  });
+    // now for all maximum corners, initialize a new seed
+    px_vec.clear(); px_vec.reserve(new_features.size());
+    f_vec.clear(); f_vec.reserve(new_features.size());
+    std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
+        px_vec.push_back(cv::Point2f(ftr->px[0], ftr->px[1]));
+        f_vec.push_back(ftr->f);
+        delete ftr;
+    });
 }
 
 void trackKlt(

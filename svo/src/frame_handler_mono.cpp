@@ -64,47 +64,47 @@ FrameHandlerMono::~FrameHandlerMono()
 
 void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 {
-  if(!startFrameProcessingCommon(timestamp))
-    return;
+    if (!startFrameProcessingCommon(timestamp))
+        return;
 
-  // some cleanup from last iteration, can't do before because of visualization
-  core_kfs_.clear();
-  overlap_kfs_.clear();
+    // some cleanup from last iteration, can't do before because of visualization
+    core_kfs_.clear();
+    overlap_kfs_.clear();
 
-  // create new frame
-  SVO_START_TIMER("pyramid_creation");
-  new_frame_.reset(new Frame(cam_, img.clone(), timestamp));
-  SVO_STOP_TIMER("pyramid_creation");
+    // create new frame
+    SVO_START_TIMER("pyramid_creation");
+    new_frame_.reset(new Frame(cam_, img.clone(), timestamp));
+    SVO_STOP_TIMER("pyramid_creation");
 
-  // process frame
-  UpdateResult res = RESULT_FAILURE;
-  if(stage_ == STAGE_DEFAULT_FRAME)
-    res = processFrame();
-  else if(stage_ == STAGE_SECOND_FRAME)
-    res = processSecondFrame();
-  else if(stage_ == STAGE_FIRST_FRAME)
-    res = processFirstFrame();
-  else if(stage_ == STAGE_RELOCALIZING)
-    res = relocalizeFrame(SE3(Matrix3d::Identity(), Vector3d::Zero()),
-                          map_.getClosestKeyframe(last_frame_));
+    // process frame
+    UpdateResult res = RESULT_FAILURE;
+    if (stage_ == STAGE_DEFAULT_FRAME)
+        res = processFrame();
+    else if (stage_ == STAGE_SECOND_FRAME)
+        res = processSecondFrame();
+    else if (stage_ == STAGE_FIRST_FRAME)
+        res = processFirstFrame();
+    else if (stage_ == STAGE_RELOCALIZING)
+        res = relocalizeFrame(SE3(Matrix3d::Identity(), Vector3d::Zero()),
+                              map_.getClosestKeyframe(last_frame_));
 
-  // set last frame
-  last_frame_ = new_frame_;
-  new_frame_.reset();
-  // finish processing
-  finishFrameProcessingCommon(last_frame_->id_, res, last_frame_->nObs());
+    // set last frame
+    last_frame_ = new_frame_;
+    new_frame_.reset();
+    // finish processing
+    finishFrameProcessingCommon(last_frame_->id_, res, last_frame_->nObs());
 }
 
 FrameHandlerMono::UpdateResult FrameHandlerMono::processFirstFrame()
 {
-  new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
-  if(klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
-    return RESULT_NO_KEYFRAME;
-  new_frame_->setKeyframe();
-  map_.addKeyframe(new_frame_);
-  stage_ = STAGE_SECOND_FRAME;
-  SVO_INFO_STREAM("Init: Selected first frame.");
-  return RESULT_IS_KEYFRAME;
+    new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
+    if (klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
+        return RESULT_NO_KEYFRAME;
+    new_frame_->setKeyframe();
+    map_.addKeyframe(new_frame_);
+    stage_ = STAGE_SECOND_FRAME;
+    SVO_INFO_STREAM("Init: Selected first frame.");
+    return RESULT_IS_KEYFRAME;
 }
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
@@ -291,12 +291,12 @@ bool FrameHandlerMono::relocalizeFrameAtPose(
 
 void FrameHandlerMono::resetAll()
 {
-  resetCommon();
-  last_frame_.reset();
-  new_frame_.reset();
-  core_kfs_.clear();
-  overlap_kfs_.clear();
-  depth_filter_->reset();
+    resetCommon();
+    last_frame_.reset();
+    new_frame_.reset();
+    core_kfs_.clear();
+    overlap_kfs_.clear();
+    depth_filter_->reset();
 }
 
 void FrameHandlerMono::setFirstFrame(const FramePtr& first_frame)

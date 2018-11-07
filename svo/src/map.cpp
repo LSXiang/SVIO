@@ -33,9 +33,9 @@ Map::~Map()
 
 void Map::reset()
 {
-  keyframes_.clear();
-  point_candidates_.reset();
-  emptyTrash();
+    keyframes_.clear();
+    point_candidates_.reset();
+    emptyTrash();
 }
 
 bool Map::safeDeleteFrame(FramePtr frame)
@@ -194,12 +194,10 @@ void Map::transform(const Matrix3d& R, const Vector3d& t, const double& s)
 
 void Map::emptyTrash()
 {
-  std::for_each(trash_points_.begin(), trash_points_.end(), [&](Point*& pt){
-    delete pt;
-    pt=NULL;
-  });
-  trash_points_.clear();
-  point_candidates_.emptyTrash();
+    std::for_each(trash_points_.begin(), trash_points_.end(),
+                  [&](Point*& pt){ delete pt; pt=NULL; });
+    trash_points_.clear();
+    point_candidates_.emptyTrash();
 }
 
 MapPointCandidates::MapPointCandidates()
@@ -207,14 +205,14 @@ MapPointCandidates::MapPointCandidates()
 
 MapPointCandidates::~MapPointCandidates()
 {
-  reset();
+    reset();
 }
 
 void MapPointCandidates::newCandidatePoint(Point* point, double depth_sigma2)
 {
-  point->type_ = Point::TYPE_CANDIDATE;
-  boost::unique_lock<boost::mutex> lock(mut_);
-  candidates_.push_back(PointCandidate(point, point->obs_.front()));
+    point->type_ = Point::TYPE_CANDIDATE;
+    boost::unique_lock<boost::mutex> lock(mut_);
+    candidates_.push_back(PointCandidate(point, point->obs_.front()));
 }
 
 void MapPointCandidates::addCandidatePointToFrame(FramePtr frame)
@@ -288,10 +286,9 @@ void MapPointCandidates::deleteCandidate(PointCandidate& c)
 
 void MapPointCandidates::emptyTrash()
 {
-  std::for_each(trash_points_.begin(), trash_points_.end(), [&](Point*& p){
-    delete p; p=NULL;
-  });
-  trash_points_.clear();
+    std::for_each(trash_points_.begin(), trash_points_.end(),
+                  [&](Point*& p){ delete p; p=NULL; });
+    trash_points_.clear();
 }
 
 namespace map_debug {

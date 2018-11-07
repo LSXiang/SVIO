@@ -70,47 +70,46 @@ void halfSampleNEON( const cv::Mat& in, cv::Mat& out )
 void
 halfSample(const cv::Mat& in, cv::Mat& out)
 {
-  assert( in.rows/2==out.rows && in.cols/2==out.cols);
-  assert( in.type()==CV_8U && out.type()==CV_8U);
+    assert( in.rows/2==out.rows && in.cols/2==out.cols);
+    assert( in.type()==CV_8U && out.type()==CV_8U);
 
 #ifdef __SSE2__
-  if(aligned_mem::is_aligned16(in.data) && aligned_mem::is_aligned16(out.data) && ((in.cols % 16) == 0))
-  {
-    halfSampleSSE2(in.data, out.data, in.cols, in.rows);
-    return;
-  }
+    if (aligned_mem::is_aligned16(in.data) && aligned_mem::is_aligned16(out.data) && ((in.cols % 16) == 0))
+    {
+        halfSampleSSE2(in.data, out.data, in.cols, in.rows);
+        return;
+    }
 #endif 
 #ifdef __ARM_NEON__ 
-  if( (in.cols % 16) == 0 )
-  {
-    halfSampleNEON(in, out);
-    return;
-  }
+    if ( (in.cols % 16) == 0 )
+    {
+        halfSampleNEON(in, out);
+        return;
+    }
 #endif
 
-  const int stride = in.step.p[0];
-  uint8_t* top = (uint8_t*) in.data;
-  uint8_t* bottom = top + stride;
-  uint8_t* end = top + stride*in.rows;
-  const int out_width = out.cols;
-  uint8_t* p = (uint8_t*) out.data;
-  while (bottom < end)
-  {
-    for (int j=0; j<out_width; j++)
+    const int stride = in.step.p[0];
+    uint8_t* top = (uint8_t*) in.data;
+    uint8_t* bottom = top + stride;
+    uint8_t* end = top + stride*in.rows;
+    const int out_width = out.cols;
+    uint8_t* p = (uint8_t*) out.data;
+    while (bottom < end)
     {
-      *p = static_cast<uint8_t>( (uint16_t (top[0]) + top[1] + bottom[0] + bottom[1])/4 );
-      p++;
-      top += 2;
-      bottom += 2;
+        for (int j=0; j<out_width; j++) 
+        {
+            *p = static_cast<uint8_t>( (uint16_t (top[0]) + top[1] + bottom[0] + bottom[1])/4 );
+            p++;
+            top += 2;
+            bottom += 2;
+        }
+        top += stride;
+        bottom += stride;
     }
-    top += stride;
-    bottom += stride;
-  }
 }
 
-
-float
-shiTomasiScore(const cv::Mat& img, int u, int v)
+// refer to https://blog.csdn.net/hzwwpgmwy/article/details/81482278
+float shiTomasiScore(const cv::Mat& img, int u, int v)
 {
   assert(img.type() == CV_8UC1);
 

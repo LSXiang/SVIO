@@ -41,33 +41,34 @@ PinholeCamera::
 ~PinholeCamera()
 {}
 
-Vector3d PinholeCamera::
-cam2world(const double& u, const double& v) const
+/**
+ * The point 3d is the Unit-bearing vector
+ */
+Vector3d PinholeCamera::cam2world(const double& u, const double& v) const
 {
-  Vector3d xyz;
-  if(!distortion_)
-  {
-    xyz[0] = (u - cx_)/fx_;
-    xyz[1] = (v - cy_)/fy_;
-    xyz[2] = 1.0;
-  }
-  else
-  {
-    cv::Point2f uv(u,v), px;
-    const cv::Mat src_pt(1, 1, CV_32FC2, &uv.x);
-    cv::Mat dst_pt(1, 1, CV_32FC2, &px.x);
-    cv::undistortPoints(src_pt, dst_pt, cvK_, cvD_);
-    xyz[0] = px.x;
-    xyz[1] = px.y;
-    xyz[2] = 1.0;
-  }
-  return xyz.normalized();
+    Vector3d xyz;
+    if(!distortion_)
+    {
+        xyz[0] = (u - cx_)/fx_;
+        xyz[1] = (v - cy_)/fy_;
+        xyz[2] = 1.0;
+    }
+    else
+    {
+        cv::Point2f uv(u,v), px;
+        const cv::Mat src_pt(1, 1, CV_32FC2, &uv.x);
+        cv::Mat dst_pt(1, 1, CV_32FC2, &px.x);
+        cv::undistortPoints(src_pt, dst_pt, cvK_, cvD_);
+        xyz[0] = px.x;
+        xyz[1] = px.y;
+        xyz[2] = 1.0;
+    }
+    return xyz.normalized();
 }
 
-Vector3d PinholeCamera::
-cam2world (const Vector2d& uv) const
+Vector3d PinholeCamera::cam2world (const Vector2d& uv) const
 {
-  return cam2world(uv[0], uv[1]);
+    return cam2world(uv[0], uv[1]);
 }
 
 Vector2d PinholeCamera::

@@ -35,13 +35,13 @@ vk::PerformanceMonitor* g_permon = NULL;
 #endif
 
 FrameHandlerBase::FrameHandlerBase() :
-  stage_(STAGE_PAUSED),
-  set_reset_(false),
-  set_start_(false),
-  acc_frame_timings_(10),
-  acc_num_obs_(10),
-  num_obs_last_(0),
-  tracking_quality_(TRACKING_INSUFFICIENT)
+    stage_(STAGE_PAUSED),
+    set_reset_(false),
+    set_start_(false),
+    acc_frame_timings_(10),
+    acc_num_obs_(10),
+    num_obs_last_(0),
+    tracking_quality_(TRACKING_INSUFFICIENT)
 {
 #ifdef SVO_TRACE
   // Initialize Performance Monitor
@@ -78,31 +78,30 @@ FrameHandlerBase::FrameHandlerBase() :
 
 FrameHandlerBase::~FrameHandlerBase()
 {
-  SVO_INFO_STREAM("SVO destructor invoked");
+    SVO_INFO_STREAM("SVO destructor invoked");
 #ifdef SVO_TRACE
-  delete g_permon;
+    delete g_permon;
 #endif
 }
 
 bool FrameHandlerBase::startFrameProcessingCommon(const double timestamp)
 {
-  if(set_start_)
-  {
-    resetAll();
-    stage_ = STAGE_FIRST_FRAME;
-  }
+    if (set_start_) {
+        resetAll();
+        stage_ = STAGE_FIRST_FRAME;
+    }
 
-  if(stage_ == STAGE_PAUSED)
-    return false;
+    if(stage_ == STAGE_PAUSED)
+        return false;
 
-  SVO_LOG(timestamp);
-  SVO_DEBUG_STREAM("New Frame");
-  SVO_START_TIMER("tot_time");
-  timer_.start();
+    SVO_LOG(timestamp);
+    SVO_DEBUG_STREAM("New Frame");
+    SVO_START_TIMER("tot_time");
+    timer_.start();
 
-  // some cleanup from last iteration, can't do before because of visualization
-  map_.emptyTrash();
-  return true;
+    // some cleanup from last iteration, can't do before because of visualization
+    map_.emptyTrash();
+    return true;
 }
 
 int FrameHandlerBase::finishFrameProcessingCommon(
@@ -145,13 +144,13 @@ int FrameHandlerBase::finishFrameProcessingCommon(
 
 void FrameHandlerBase::resetCommon()
 {
-  map_.reset();
-  stage_ = STAGE_PAUSED;
-  set_reset_ = false;
-  set_start_ = false;
-  tracking_quality_ = TRACKING_INSUFFICIENT;
-  num_obs_last_ = 0;
-  SVO_INFO_STREAM("RESET");
+    map_.reset();
+    stage_ = STAGE_PAUSED;
+    set_reset_ = false;
+    set_start_ = false;
+    tracking_quality_ = TRACKING_INSUFFICIENT;
+    num_obs_last_ = 0;
+    SVO_INFO_STREAM("RESET");
 }
 
 void FrameHandlerBase::setTrackingQuality(const size_t num_observations)
