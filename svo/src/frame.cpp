@@ -61,23 +61,24 @@ void Frame::initFrame(const cv::Mat& img)
 
 void Frame::setKeyframe()
 {
-  is_keyframe_ = true;
-  setKeyPoints();
+    is_keyframe_ = true;
+    setKeyPoints();
 }
 
 void Frame::addFeature(Feature* ftr)
 {
-  fts_.push_back(ftr);
+    fts_.push_back(ftr);
 }
 
 void Frame::setKeyPoints()
 {
-  for(size_t i = 0; i < 5; ++i)
-    if(key_pts_[i] != NULL)
-      if(key_pts_[i]->point == NULL)
-        key_pts_[i] = NULL;
+    for(size_t i = 0; i < 5; ++i)
+        if(key_pts_[i] != NULL)
+            if(key_pts_[i]->point == NULL)
+                key_pts_[i] = NULL;
 
-  std::for_each(fts_.begin(), fts_.end(), [&](Feature* ftr){ if(ftr->point != NULL) checkKeyPoints(ftr); });
+    // find five features which are closest to the 4 image corners and to the center and which have a 3D point assigned
+    std::for_each(fts_.begin(), fts_.end(), [&](Feature* ftr){ if(ftr->point != NULL) checkKeyPoints(ftr); });
 }
 
 void Frame::checkKeyPoints(Feature* ftr)
@@ -92,6 +93,7 @@ void Frame::checkKeyPoints(Feature* ftr)
         < std::max(std::fabs(key_pts_[0]->px[0]-cu), std::fabs(key_pts_[0]->px[1]-cv)))
     key_pts_[0] = ftr;
 
+  // right bottom
   if(ftr->px[0] >= cu && ftr->px[1] >= cv)
   {
     if(key_pts_[1] == NULL)
@@ -100,6 +102,8 @@ void Frame::checkKeyPoints(Feature* ftr)
           > (key_pts_[1]->px[0]-cu) * (key_pts_[1]->px[1]-cv))
       key_pts_[1] = ftr;
   }
+  
+  // right top
   if(ftr->px[0] >= cu && ftr->px[1] < cv)
   {
     if(key_pts_[2] == NULL)
@@ -108,6 +112,8 @@ void Frame::checkKeyPoints(Feature* ftr)
           < (key_pts_[2]->px[0]-cu) * (key_pts_[2]->px[1]-cv))
       key_pts_[2] = ftr;
   }
+  
+  // left top
   if(ftr->px[0] < cu && ftr->px[1] < cv)
   {
     if(key_pts_[3] == NULL)
@@ -116,6 +122,8 @@ void Frame::checkKeyPoints(Feature* ftr)
           > (key_pts_[3]->px[0]-cu) * (key_pts_[3]->px[1]-cv))
       key_pts_[3] = ftr;
   }
+  
+  // left bottom
   if(ftr->px[0] < cu && ftr->px[1] >= cv)
   {
     if(key_pts_[4] == NULL)

@@ -98,8 +98,12 @@ void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 FrameHandlerMono::UpdateResult FrameHandlerMono::processFirstFrame()
 {
     new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
+    
     if (klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
         return RESULT_NO_KEYFRAME;
+    
+    // Set is_keyframe_, but now does not set keyPoint(the reason is that the frame.fts_ is empty)
+    // So, in the processSecondFrame function, add call the frame setKeyPoints function 
     new_frame_->setKeyframe();
     map_.addKeyframe(new_frame_);
     stage_ = STAGE_SECOND_FRAME;
@@ -120,6 +124,7 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
   ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);
 #endif
 
+  map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
   new_frame_->setKeyframe();
   double depth_mean, depth_min;
   frame_utils::getSceneDepth(*new_frame_, depth_mean, depth_min);
