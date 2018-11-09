@@ -42,16 +42,16 @@ InitResult KltHomographyInit::addFirstFrame(FramePtr frame_ref)
 
 InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur)
 {
-  trackKlt(frame_ref_, frame_cur, px_ref_, px_cur_, f_ref_, f_cur_, disparities_);
-  SVO_INFO_STREAM("Init: KLT tracked "<< disparities_.size() <<" features");
+    trackKlt(frame_ref_, frame_cur, px_ref_, px_cur_, f_ref_, f_cur_, disparities_);
+    SVO_INFO_STREAM("Init: KLT tracked "<< disparities_.size() <<" features");
 
-  if(disparities_.size() < Config::initMinTracked())
-    return FAILURE;
+    if(disparities_.size() < Config::initMinTracked())  // initMinTracked default is 50
+        return FAILURE;
 
-  double disparity = vk::getMedian(disparities_);
-  SVO_INFO_STREAM("Init: KLT "<<disparity<<"px average disparity.");
-  if(disparity < Config::initMinDisparity())
-    return NO_KEYFRAME;
+    double disparity = vk::getMedian(disparities_); // get the median of the disparities
+    SVO_INFO_STREAM("Init: KLT "<<disparity<<"px average disparity.");
+    if(disparity < Config::initMinDisparity())      // initMinDisparity 50.0
+        return NO_KEYFRAME;
 
   computeHomography(
       f_ref_, f_cur_,
@@ -133,39 +133,42 @@ void trackKlt(
     vector<Vector3d>& f_cur,
     vector<double>& disparities)
 {
-  const double klt_win_size = 30.0;
-  const int klt_max_iter = 30;
-  const double klt_eps = 0.001;
-  vector<uchar> status;
-  vector<float> error;
-  vector<float> min_eig_vec;
-  cv::TermCriteria termcrit(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, klt_max_iter, klt_eps);
-  cv::calcOpticalFlowPyrLK(frame_ref->img_pyr_[0], frame_cur->img_pyr_[0],
-                           px_ref, px_cur,
-                           status, error,
-                           cv::Size2i(klt_win_size, klt_win_size),
-                           4, termcrit, cv::OPTFLOW_USE_INITIAL_FLOW);
+    const double klt_win_size = 30.0;   // size of search window
+    const int klt_max_iter = 30;        // the maximum of iteratopms
+    const double klt_eps = 0.001;       // the minimum change per iteration
+    vector<uchar> status;               // for each point, found=1, else=0
+    vector<float> error;                // Error measure for found points
+    vector<float> min_eig_vec;          // no use
+    cv::TermCriteria termcrit(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, klt_max_iter, klt_eps);    // how to the end
+    cv::calcOpticalFlowPyrLK(frame_ref->img_pyr_[0], frame_cur->img_pyr_[0],
+                             px_ref, px_cur,
+                             status, error,
+                             cv::Size2i(klt_win_size, klt_win_size),
+                             4, termcrit, cv::OPTFLOW_USE_INITIAL_FLOW);
 
-  vector<cv::Point2f>::iterator px_ref_it = px_ref.begin();
-  vector<cv::Point2f>::iterator px_cur_it = px_cur.begin();
-  vector<Vector3d>::iterator f_ref_it = f_ref.begin();
-  f_cur.clear(); f_cur.reserve(px_cur.size());
-  disparities.clear(); disparities.reserve(px_cur.size());
-  for(size_t i=0; px_ref_it != px_ref.end(); ++i)
-  {
-    if(!status[i])
+    vector<cv::Point2f>::iterator px_ref_it = px_ref.begin();
+    vector<cv::Point2f>::iterator px_cur_it = px_cur.begin();
+    vector<Vector3d>::iterator f_ref_it = f_ref.begin();
+    f_cur.clear(); f_cur.reserve(px_cur.size());
+    disparities.clear(); disparities.reserve(px_cur.size());
+    for(size_t i=0; px_ref_it != px_ref.end(); ++i)
     {
-      px_ref_it = px_ref.erase(px_ref_it);
-      px_cur_it = px_cur.erase(px_cur_it);
-      f_ref_it = f_ref.erase(f_ref_it);
-      continue;
+        if(!status[i])  // the flow for the corresponding features has not been found
+        {
+            // erase the features that not be corresponded
+            px_ref_it = px_ref.erase(px_ref_it);
+            px_cur_it = px_cur.erase(px_cur_it);
+            f_ref_it = f_ref.erase(f_ref_it);
+            continue;
+        }
+        // store the corresponded corners
+        f_cur.push_back(frame_cur->c2f(px_cur_it->x, px_cur_it->y));
+        // store the disparity of per corresponded corner
+        disparities.push_back(Vector2d(px_ref_it->x - px_cur_it->x, px_ref_it->y - px_cur_it->y).norm());
+        ++px_ref_it;
+        ++px_cur_it;
+        ++f_ref_it;
     }
-    f_cur.push_back(frame_cur->c2f(px_cur_it->x, px_cur_it->y));
-    disparities.push_back(Vector2d(px_ref_it->x - px_cur_it->x, px_ref_it->y - px_cur_it->y).norm());
-    ++px_ref_it;
-    ++px_cur_it;
-    ++f_ref_it;
-  }
 }
 
 void computeHomography(
