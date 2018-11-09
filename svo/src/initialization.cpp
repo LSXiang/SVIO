@@ -119,7 +119,7 @@ void detectFeatures(
     f_vec.clear(); f_vec.reserve(new_features.size());
     std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
         px_vec.push_back(cv::Point2f(ftr->px[0], ftr->px[1]));
-        f_vec.push_back(ftr->f);
+        f_vec.push_back(ftr->f);    // f_vec is unit-bearing vector of the feature (Note: the 3d f_vec position on unit sphere, not on the Normalized plane )
         delete ftr;
     });
 }
