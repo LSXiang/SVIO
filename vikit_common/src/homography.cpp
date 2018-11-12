@@ -15,46 +15,46 @@
 
 namespace vk {
 
-Homography::
-Homography(const vector<Vector2d, aligned_allocator<Vector2d> >& _fts1,
-           const vector<Vector2d, aligned_allocator<Vector2d> >& _fts2,
-           double _error_multiplier2,
-           double _thresh_in_px) :
-   thresh(_thresh_in_px),
-   error_multiplier2(_error_multiplier2),
-   fts_c1(_fts1),
-   fts_c2(_fts2)
+Homography::Homography(const vector<Vector2d, aligned_allocator<Vector2d> >& _fts1,
+                       const vector<Vector2d, aligned_allocator<Vector2d> >& _fts2,
+                       double _error_multiplier2,
+                       double _thresh_in_px) :
+    thresh(_thresh_in_px),
+    error_multiplier2(_error_multiplier2),
+    fts_c1(_fts1),
+    fts_c2(_fts2)
 {
 }
 
-void Homography::
-calcFromPlaneParams(const Vector3d& n_c1, const Vector3d& xyz_c1)
+void Homography::calcFromPlaneParams(const Vector3d& n_c1, const Vector3d& xyz_c1)
 {
-  double d = n_c1.dot(xyz_c1); // normal distance from plane to KF
-  H_c2_from_c1 = T_c2_from_c1.rotation_matrix() + (T_c2_from_c1.translation()*n_c1.transpose())/d;
+    double d = n_c1.dot(xyz_c1); // normal distance from plane to KF
+    H_c2_from_c1 = T_c2_from_c1.rotation_matrix() + (T_c2_from_c1.translation()*n_c1.transpose())/d;
 }
 
-void Homography::
-calcFromMatches()
+void Homography::calcFromMatches()
 {
-  vector<cv::Point2f> src_pts(fts_c1.size()), dst_pts(fts_c1.size());
-  for(size_t i=0; i<fts_c1.size(); ++i)
-  {
-    src_pts[i] = cv::Point2f(fts_c1[i][0], fts_c1[i][1]);
-    dst_pts[i] = cv::Point2f(fts_c2[i][0], fts_c2[i][1]);
-  }
+    // change the Eigen Vector2d type to cv Point2f, in order that used in the cv::findHomography function
+    vector<cv::Point2f> src_pts(fts_c1.size()), dst_pts(fts_c1.size());
+    for(size_t i=0; i<fts_c1.size(); ++i)
+    {
+        src_pts[i] = cv::Point2f(fts_c1[i][0], fts_c1[i][1]);
+        dst_pts[i] = cv::Point2f(fts_c2[i][0], fts_c2[i][1]);
+    }
 
-  // TODO: replace this function to remove dependency from opencv!
-  cv::Mat cvH = cv::findHomography(src_pts, dst_pts, CV_RANSAC, 2./error_multiplier2);
-  H_c2_from_c1(0,0) = cvH.at<double>(0,0);
-  H_c2_from_c1(0,1) = cvH.at<double>(0,1);
-  H_c2_from_c1(0,2) = cvH.at<double>(0,2);
-  H_c2_from_c1(1,0) = cvH.at<double>(1,0);
-  H_c2_from_c1(1,1) = cvH.at<double>(1,1);
-  H_c2_from_c1(1,2) = cvH.at<double>(1,2);
-  H_c2_from_c1(2,0) = cvH.at<double>(2,0);
-  H_c2_from_c1(2,1) = cvH.at<double>(2,1);
-  H_c2_from_c1(2,2) = cvH.at<double>(2,2);
+    // TODO: replace this function to remove dependency from opencv! (Can try IPEE: https://github.com/tobycollins/IPPE)
+    //!< 1:input array source points  2:input array result points  3:0, cv::RANSAC, cv::LMEDS, etc. 4:max reprojection error 
+    //!< in the case, the reprojection error of 2 pixels in the unit plane is 2./f_length
+    cv::Mat cvH = cv::findHomography(src_pts, dst_pts, CV_RANSAC, 2./error_multiplier2);
+    H_c2_from_c1(0,0) = cvH.at<double>(0,0);
+    H_c2_from_c1(0,1) = cvH.at<double>(0,1);
+    H_c2_from_c1(0,2) = cvH.at<double>(0,2);
+    H_c2_from_c1(1,0) = cvH.at<double>(1,0);
+    H_c2_from_c1(1,1) = cvH.at<double>(1,1);
+    H_c2_from_c1(1,2) = cvH.at<double>(1,2);
+    H_c2_from_c1(2,0) = cvH.at<double>(2,0);
+    H_c2_from_c1(2,1) = cvH.at<double>(2,1);
+    H_c2_from_c1(2,2) = cvH.at<double>(2,2);
 }
 
 size_t Homography::
@@ -74,135 +74,133 @@ computeMatchesInliers()
 
 }
 
-bool Homography::
-computeSE3fromMatches()
+bool Homography::computeSE3fromMatches()
 {
-  calcFromMatches();
-  bool res = decompose();
-  if(!res)
-    return false;
-  computeMatchesInliers();
-  findBestDecomposition();
-  T_c2_from_c1 = decompositions.front().T;
-  return true;
+    calcFromMatches();
+    bool res = decompose();
+    if(!res)
+        return false;
+    computeMatchesInliers();
+    findBestDecomposition();
+    T_c2_from_c1 = decompositions.front().T;
+    return true;
 }
 
-bool Homography::
-decompose()
+bool Homography::decompose()
 {
-  decompositions.clear();
-  JacobiSVD<MatrixXd> svd(H_c2_from_c1, ComputeThinU | ComputeThinV);
+    decompositions.clear();
+    JacobiSVD<MatrixXd> svd(H_c2_from_c1, ComputeThinU | ComputeThinV);
 
-  Vector3d singular_values = svd.singularValues();
+    Vector3d singular_values = svd.singularValues();
 
-  double d1 = fabs(singular_values[0]); // The paper suggests the square of these (e.g. the evalues of AAT)
-  double d2 = fabs(singular_values[1]); // should be used, but this is wrong. c.f. Faugeras' book.
-  double d3 = fabs(singular_values[2]);
+    double d1 = fabs(singular_values[0]); // The paper suggests the square of these (e.g. the evalues of AAT)
+    double d2 = fabs(singular_values[1]); // should be used, but this is wrong. c.f. Faugeras' book.
+    double d3 = fabs(singular_values[2]);
 
-  Matrix3d U = svd.matrixU();
-  Matrix3d V = svd.matrixV();                    // VT^T
+    Matrix3d U = svd.matrixU();
+    Matrix3d V = svd.matrixV();                    // VT^T
 
-  double s = U.determinant() * V.determinant();
+    double s = U.determinant() * V.determinant();
 
-  double dPrime_PM = d2;
+    double dPrime_PM = d2;
 
-  int nCase;
-  if(d1 != d2 && d2 != d3)
-    nCase = 1;
-  else if( d1 == d2 && d2 == d3)
-    nCase = 3;
-  else
-    nCase = 2;
+    int nCase;
+    if(d1 != d2 && d2 != d3)
+        nCase = 1;
+    else if( d1 == d2 && d2 == d3)
+        nCase = 3;
+    else
+        nCase = 2;
 
-  if(nCase != 1)
-  {
-    printf("FATAL Homography Initialization: This motion case is not implemented or is degenerate. Try again. ");
-    return false;
-  }
+    if(nCase != 1)
+    {
+        printf("FATAL Homography Initialization: This motion case is not implemented or is degenerate. Try again. ");
+        return false;
+    }
 
-  double x1_PM;
-  double x2;
-  double x3_PM;
+    double x1_PM;
+    double x2;
+    double x3_PM;
 
-  // All below deals with the case = 1 case.
-  // Case 1 implies (d1 != d3)
-  { // Eq. 12
-    x1_PM = sqrt((d1*d1 - d2*d2) / (d1*d1 - d3*d3));
-    x2    = 0;
-    x3_PM = sqrt((d2*d2 - d3*d3) / (d1*d1 - d3*d3));
-  };
+    // All below deals with the case = 1 case.
+    // Case 1 implies (d1 != d3)
+    { // Eq. 12
+        x1_PM = sqrt((d1*d1 - d2*d2) / (d1*d1 - d3*d3));
+        x2    = 0;
+        x3_PM = sqrt((d2*d2 - d3*d3) / (d1*d1 - d3*d3));
+    };
 
-  double e1[4] = {1.0,-1.0, 1.0,-1.0};
-  double e3[4] = {1.0, 1.0,-1.0,-1.0};
+    double e1[4] = {1.0,-1.0, 1.0,-1.0};
+    double e3[4] = {1.0, 1.0,-1.0,-1.0};
 
-  Vector3d np;
-  HomographyDecomposition decomp;
+    Vector3d np;
+    HomographyDecomposition decomp;
 
-  // Case 1, d' > 0:
-  decomp.d = s * dPrime_PM;
-  for(size_t signs=0; signs<4; signs++)
-  {
-    // Eq 13
-    decomp.R = Matrix3d::Identity();
-    double dSinTheta = (d1 - d3) * x1_PM * x3_PM * e1[signs] * e3[signs] / d2;
-    double dCosTheta = (d1 * x3_PM * x3_PM + d3 * x1_PM * x1_PM) / d2;
-    decomp.R(0,0) = dCosTheta;
-    decomp.R(0,2) = -dSinTheta;
-    decomp.R(2,0) = dSinTheta;
-    decomp.R(2,2) = dCosTheta;
+    // Case 1, d' > 0:
+    decomp.d = s * dPrime_PM;
+    for(size_t signs=0; signs<4; signs++)
+    {
+        // Eq 13
+        decomp.R = Matrix3d::Identity();
+        double dSinTheta = (d1 - d3) * x1_PM * x3_PM * e1[signs] * e3[signs] / d2;
+        double dCosTheta = (d1 * x3_PM * x3_PM + d3 * x1_PM * x1_PM) / d2;
+        decomp.R(0,0) = dCosTheta;
+        decomp.R(0,2) = -dSinTheta;
+        decomp.R(2,0) = dSinTheta;
+        decomp.R(2,2) = dCosTheta;
 
-    // Eq 14
-    decomp.t[0] = (d1 - d3) * x1_PM * e1[signs];
-    decomp.t[1] = 0.0;
-    decomp.t[2] = (d1 - d3) * -x3_PM * e3[signs];
+        // Eq 14
+        decomp.t[0] = (d1 - d3) * x1_PM * e1[signs];
+        decomp.t[1] = 0.0;
+        decomp.t[2] = (d1 - d3) * -x3_PM * e3[signs];
 
-    np[0] = x1_PM * e1[signs];
-    np[1] = x2;
-    np[2] = x3_PM * e3[signs];
-    decomp.n = V * np;
+        np[0] = x1_PM * e1[signs];
+        np[1] = x2;
+        np[2] = x3_PM * e3[signs];
+        decomp.n = V * np;
 
-    decompositions.push_back(decomp);
-  }
+        decompositions.push_back(decomp);
+    }
 
-  // Case 1, d' < 0:
-  decomp.d = s * -dPrime_PM;
-  for(size_t signs=0; signs<4; signs++)
-  {
-    // Eq 15
-    decomp.R = -1 * Matrix3d::Identity();
-    double dSinPhi = (d1 + d3) * x1_PM * x3_PM * e1[signs] * e3[signs] / d2;
-    double dCosPhi = (d3 * x1_PM * x1_PM - d1 * x3_PM * x3_PM) / d2;
-    decomp.R(0,0) = dCosPhi;
-    decomp.R(0,2) = dSinPhi;
-    decomp.R(2,0) = dSinPhi;
-    decomp.R(2,2) = -dCosPhi;
+    // Case 1, d' < 0:
+    decomp.d = s * -dPrime_PM;
+    for(size_t signs=0; signs<4; signs++)
+    {
+        // Eq 15
+        decomp.R = -1 * Matrix3d::Identity();
+        double dSinPhi = (d1 + d3) * x1_PM * x3_PM * e1[signs] * e3[signs] / d2;
+        double dCosPhi = (d3 * x1_PM * x1_PM - d1 * x3_PM * x3_PM) / d2;
+        decomp.R(0,0) = dCosPhi;
+        decomp.R(0,2) = dSinPhi;
+        decomp.R(2,0) = dSinPhi;
+        decomp.R(2,2) = -dCosPhi;
 
-    // Eq 16
-    decomp.t[0] = (d1 + d3) * x1_PM * e1[signs];
-    decomp.t[1] = 0.0;
-    decomp.t[2] = (d1 + d3) * x3_PM * e3[signs];
+        // Eq 16
+        decomp.t[0] = (d1 + d3) * x1_PM * e1[signs];
+        decomp.t[1] = 0.0;
+        decomp.t[2] = (d1 + d3) * x3_PM * e3[signs];
 
-    np[0] = x1_PM * e1[signs];
-    np[1] = x2;
-    np[2] = x3_PM * e3[signs];
-    decomp.n = V * np;
+        np[0] = x1_PM * e1[signs];
+        np[1] = x2;
+        np[2] = x3_PM * e3[signs];
+        decomp.n = V * np;
 
-    decompositions.push_back(decomp);
-  }
+        decompositions.push_back(decomp);
+    }
 
-  // Save rotation and translation of the decomposition
-  for(unsigned int i=0; i<decompositions.size(); i++)
-  {
-    Matrix3d R = s * U * decompositions[i].R * V.transpose();
-    Vector3d t = U * decompositions[i].t;
-    decompositions[i].T = Sophus::SE3(R, t);
-  }
-  return true;
+    // Save rotation and translation of the decomposition
+    for(unsigned int i=0; i<decompositions.size(); i++)
+    {
+        Matrix3d R = s * U * decompositions[i].R * V.transpose();
+        Vector3d t = U * decompositions[i].t;
+        decompositions[i].T = Sophus::SE3(R, t);
+    }
+    return true;
 }
 
 bool operator<(const HomographyDecomposition lhs, const HomographyDecomposition rhs)
 {
-  return lhs.score < rhs.score;
+    return lhs.score < rhs.score;
 }
 
 void Homography::

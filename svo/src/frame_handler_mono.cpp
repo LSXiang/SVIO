@@ -113,29 +113,29 @@ FrameHandlerMono::UpdateResult FrameHandlerMono::processFirstFrame()
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
 {
-  initialization::InitResult res = klt_homography_init_.addSecondFrame(new_frame_);
-  if(res == initialization::FAILURE)
-    return RESULT_FAILURE;
-  else if(res == initialization::NO_KEYFRAME)
-    return RESULT_NO_KEYFRAME;
+    initialization::InitResult res = klt_homography_init_.addSecondFrame(new_frame_);
+    if(res == initialization::FAILURE)
+        return RESULT_FAILURE;
+    else if(res == initialization::NO_KEYFRAME)
+        return RESULT_NO_KEYFRAME;
 
-  // two-frame bundle adjustment
+    // two-frame bundle adjustment
 #ifdef USE_BUNDLE_ADJUSTMENT
-  ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);
+    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);
 #endif
 
-  map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
-  new_frame_->setKeyframe();
-  double depth_mean, depth_min;
-  frame_utils::getSceneDepth(*new_frame_, depth_mean, depth_min);
-  depth_filter_->addKeyframe(new_frame_, depth_mean, 0.5*depth_min);
+    map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
+    new_frame_->setKeyframe();
+    double depth_mean, depth_min;
+    frame_utils::getSceneDepth(*new_frame_, depth_mean, depth_min);
+    depth_filter_->addKeyframe(new_frame_, depth_mean, 0.5*depth_min);
 
-  // add frame to map
-  map_.addKeyframe(new_frame_);
-  stage_ = STAGE_DEFAULT_FRAME;
-  klt_homography_init_.reset();
-  SVO_INFO_STREAM("Init: Selected second frame, triangulated initial map.");
-  return RESULT_IS_KEYFRAME;
+    // add frame to map
+    map_.addKeyframe(new_frame_);
+    stage_ = STAGE_DEFAULT_FRAME;
+    klt_homography_init_.reset();
+    SVO_INFO_STREAM("Init: Selected second frame, triangulated initial map.");
+    return RESULT_IS_KEYFRAME;
 }
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processFrame()

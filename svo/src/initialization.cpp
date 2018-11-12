@@ -53,17 +53,17 @@ InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur)
     if(disparity < Config::initMinDisparity())      // initMinDisparity 50.0
         return NO_KEYFRAME;
 
-  computeHomography(
-      f_ref_, f_cur_,
-      frame_ref_->cam_->errorMultiplier2(), Config::poseOptimThresh(),
-      inliers_, xyz_in_cur_, T_cur_from_ref_);
-  SVO_INFO_STREAM("Init: Homography RANSAC "<<inliers_.size()<<" inliers.");
+    computeHomography(
+        f_ref_, f_cur_,
+        frame_ref_->cam_->errorMultiplier2(), Config::poseOptimThresh(),
+        inliers_, xyz_in_cur_, T_cur_from_ref_);
+    SVO_INFO_STREAM("Init: Homography RANSAC "<<inliers_.size()<<" inliers.");
 
-  if(inliers_.size() < Config::initMinInliers())
-  {
-    SVO_WARN_STREAM("Init WARNING: "<<Config::initMinInliers()<<" inliers minimum required.");
-    return FAILURE;
-  }
+    if(inliers_.size() < Config::initMinInliers())
+    {
+        SVO_WARN_STREAM("Init WARNING: "<<Config::initMinInliers()<<" inliers minimum required.");
+        return FAILURE;
+    }
 
   // Rescale the map such that the mean scene depth is equal to the specified scale
   vector<double> depth_vec;
@@ -180,21 +180,23 @@ void computeHomography(
     vector<Vector3d>& xyz_in_cur,
     SE3& T_cur_from_ref)
 {
-  vector<Vector2d > uv_ref(f_ref.size());
-  vector<Vector2d > uv_cur(f_cur.size());
-  for(size_t i=0, i_max=f_ref.size(); i<i_max; ++i)
-  {
-    uv_ref[i] = vk::project2d(f_ref[i]);
-    uv_cur[i] = vk::project2d(f_cur[i]);
-  }
-  vk::Homography Homography(uv_ref, uv_cur, focal_length, reprojection_threshold);
-  Homography.computeSE3fromMatches();
-  vector<int> outliers;
-  vk::computeInliers(f_cur, f_ref,
-                     Homography.T_c2_from_c1.rotation_matrix(), Homography.T_c2_from_c1.translation(),
-                     reprojection_threshold, focal_length,
-                     xyz_in_cur, inliers, outliers);
-  T_cur_from_ref = Homography.T_c2_from_c1;
+    // change the feature points of the unit sphere to unit plane
+    vector<Vector2d > uv_ref(f_ref.size());
+    vector<Vector2d > uv_cur(f_cur.size());
+    for(size_t i=0, i_max=f_ref.size(); i<i_max; ++i)
+    {
+        uv_ref[i] = vk::project2d(f_ref[i]);
+        uv_cur[i] = vk::project2d(f_cur[i]);
+    }
+    
+    vk::Homography Homography(uv_ref, uv_cur, focal_length, reprojection_threshold);  // reprojection_threshold default: 2.0
+    Homography.computeSE3fromMatches();
+    vector<int> outliers;
+    vk::computeInliers(f_cur, f_ref,
+                       Homography.T_c2_from_c1.rotation_matrix(), Homography.T_c2_from_c1.translation(),
+                       reprojection_threshold, focal_length,
+                       xyz_in_cur, inliers, outliers);
+    T_cur_from_ref = Homography.T_c2_from_c1;
 }
 
 

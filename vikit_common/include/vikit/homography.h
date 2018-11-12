@@ -72,8 +72,8 @@ public:
   const vector<Vector2d, aligned_allocator<Vector2d> >& fts_c1; //!< Features on first image on unit plane
   const vector<Vector2d, aligned_allocator<Vector2d> >& fts_c2; //!< Features on second image on unit plane
   vector<bool> inliers;
-  SE3 T_c2_from_c1;             //!< Relative translation and rotation of two images
-  Matrix3d H_c2_from_c1;                   //!< Homography
+  SE3 T_c2_from_c1;         //!< Relative translation and rotation of two images
+  Matrix3d H_c2_from_c1;    //!< Homography
   vector<HomographyDecomposition> decompositions;
 };
 
