@@ -97,7 +97,13 @@ bool Homography::computeSE3fromMatches()
  *
  * A = dR + t(n^T)
  * SVD: A = UΛ(V^T)
- * s = det(U)det(V) s^2 = 1, Λ = (sd)(s(U^T)RV) + ((U^T)t)(((V^T)n)^T) ~= d'R' + t'(n'^T)
+ * where,
+ *     |d1      |
+ * Λ = |   d2   |
+ *     |      d3|
+ * 
+ * s = det(U)det(V) s^2 = 1,  U(U^T) = V(V^T) = I
+ * Λ = (sd)(s(U^T)RV) + ((U^T)t)(((V^T)n)^T) ~= d'R' + t'(n'^T)
  * => R = sUR'(V^T), t = Ut', n = Vn', d = sd' 
  */
 bool Homography::decompose()
