@@ -95,9 +95,10 @@ bool Homography::computeSE3fromMatches()
  *   https://gitee.com/paopaoslam/ORB-SLAM2/raw/master/ORB-SLAM2%E6%BA%90%E7%A0%81%E8%AF%A6%E8%A7%A3.pdf  Page16~23
  *   https://blog.csdn.net/kokerf/article/details/72885435
  *
- * H = dR + t(n^T)
+ * A = dR + t(n^T)
  * SVD: A = UΛ(V^T)
- * s = det(U)det(V) s^2 = 1, Λ  = (sd)(s(U^T)RV) + ((U^T)t)(((V^T)n)^T) ~= d'R' + t'n'
+ * s = det(U)det(V) s^2 = 1, Λ = (sd)(s(U^T)RV) + ((U^T)t)(((V^T)n)^T) ~= d'R' + t'(n'^T)
+ * => R = sUR'(V^T), t = Ut', n = Vn', d = sd' 
  */
 bool Homography::decompose()
 {
@@ -150,6 +151,11 @@ bool Homography::decompose()
     HomographyDecomposition decomp;
 
     // Case 1, d' > 0:
+    //
+    // compute R' & t' (have 4 case)
+    //      |CosTheta    0    -dSinTheta|                  |x1|
+    // R' = |   0        1         0    |    t' = (d1 - d3)|x2|
+    //      |SinTheta    0     dCosTheta|                  |x3|
     decomp.d = s * dPrime_PM;
     for(size_t signs=0; signs<4; signs++)
     {
@@ -176,6 +182,11 @@ bool Homography::decompose()
     }
 
     // Case 1, d' < 0:
+    //
+    // compute R' & t' (have 4 case)
+    //      |CosTheta    0    dSinTheta|                  |x1|
+    // R' = |   0       -1        0    |    t' = (d1 + d3)|x2|
+    //      |SinTheta    0   -dCosTheta|                  |x3|
     decomp.d = s * -dPrime_PM;
     for(size_t signs=0; signs<4; signs++)
     {
