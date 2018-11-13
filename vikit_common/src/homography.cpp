@@ -86,6 +86,19 @@ bool Homography::computeSE3fromMatches()
     return true;
 }
 
+/**
+ * The common way of homography matrix decomposition have [Faugeras SVD-based decomposition] and [Zhang SVD-based decomposition]
+ * The following code is used Faugeras SVD-based decomposition function.
+ * 
+ * references: Motion and structure from motion in a piecewise plannar environment
+ *   https://www.researchgate.net/publication/243764888_Motion_and_Structure_from_Motion_in_a_Piecewise_Planar_Environment
+ *   https://gitee.com/paopaoslam/ORB-SLAM2/raw/master/ORB-SLAM2%E6%BA%90%E7%A0%81%E8%AF%A6%E8%A7%A3.pdf  Page16~23
+ *   https://blog.csdn.net/kokerf/article/details/72885435
+ *
+ * H = dR + t(n^T)
+ * SVD: A = UΛ(V^T)
+ * s = det(U)det(V) s^2 = 1, Λ  = (sd)(s(U^T)RV) + ((U^T)t)(((V^T)n)^T) ~= d'R' + t'n'
+ */
 bool Homography::decompose()
 {
     decompositions.clear();
@@ -98,9 +111,9 @@ bool Homography::decompose()
     double d3 = fabs(singular_values[2]);
 
     Matrix3d U = svd.matrixU();
-    Matrix3d V = svd.matrixV();                    // VT^T
+    Matrix3d V = svd.matrixV(); // VT^T
 
-    double s = U.determinant() * V.determinant();
+    double s = U.determinant() * V.determinant();   // s = det(U)det(V)
 
     double dPrime_PM = d2;
 

@@ -28,14 +28,14 @@ using namespace std;
 
 struct HomographyDecomposition
 {
-  Vector3d t;
-  Matrix3d R;
-  double   d;
-  Vector3d n;
+    Vector3d t;
+    Matrix3d R;
+    double   d;
+    Vector3d n;
 
-  // Resolved  Composition
-  Sophus::SE3 T; //!< second from first
-  int score;
+    // Resolved  Composition
+    Sophus::SE3 T; //!< second from first
+    int score;
 };
 
 class Homography
