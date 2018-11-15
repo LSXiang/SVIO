@@ -190,7 +190,7 @@ void computeHomography(
     }
     
     vk::Homography Homography(uv_ref, uv_cur, focal_length, reprojection_threshold);  // reprojection_threshold default: 2.0
-    Homography.computeSE3fromMatches();
+    Homography.computeSE3fromMatches(); // Note: H_c_r, T_c_r
     vector<int> outliers;
     vk::computeInliers(f_cur, f_ref,
                        Homography.T_c2_from_c1.rotation_matrix(), Homography.T_c2_from_c1.translation(),

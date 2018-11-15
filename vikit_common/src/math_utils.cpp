@@ -11,23 +11,31 @@ namespace vk {
 
 using namespace Eigen;
 
-Vector3d
-triangulateFeatureNonLin(const Matrix3d& R,  const Vector3d& t,
-                         const Vector3d& feature1, const Vector3d& feature2 )
+Vector3d triangulateFeatureNonLin(const Matrix3d& R, const Vector3d& t,
+                                  const Vector3d& feature1, const Vector3d& feature2 )
 {
-  Vector3d f2 = R * feature2;
-  Vector2d b;
-  b[0] = t.dot(feature1);
-  b[1] = t.dot(f2);
-  Matrix2d A;
-  A(0,0) = feature1.dot(feature1);
-  A(1,0) = feature1.dot(f2);
-  A(0,1) = -A(1,0);
-  A(1,1) = -f2.dot(f2);
-  Vector2d lambda = A.inverse() * b;
-  Vector3d xm = lambda[0] * feature1;
-  Vector3d xn = t + lambda[1] * f2;
-  return ( xm + xn )/2;
+    /**
+     * since  d_cur * f_cur = d_ref * (R_c_r * f_ref) + t_c_r ,
+     * where d_xxx is the depth(distance of the 3D points in space to camera center)
+     *       f_xxx is the feature points of the unit sphere
+     * =>
+     *    |    (f_cur)(f_cur)          -(f_cur)(R_c_f*f_ref)    || d_cur |   | (t_c_r)(f_cur) |
+     *    |                                                     ||       | = |                |
+     *    | (f_cur)(R_c_f*f_ref)    -(R_c_f*f_ref)(R_c_f*f_ref) || d_ref |   | (t_c_r)(f_ref) |
+     */
+    Vector3d f2 = R * feature2;
+    Vector2d b;
+    b[0] = t.dot(feature1);
+    b[1] = t.dot(f2);
+    Matrix2d A;
+    A(0,0) = feature1.dot(feature1);
+    A(1,0) = feature1.dot(f2);
+    A(0,1) = -A(1,0);
+    A(1,1) = -f2.dot(f2);
+    Vector2d lambda = A.inverse() * b;
+    Vector3d xm = lambda[0] * feature1;
+    Vector3d xn = t + lambda[1] * f2;
+    return ( xm + xn )/2;
 }
 
 bool
@@ -62,36 +70,35 @@ reprojError(const Vector3d& f1,
   return error_multiplier2 * e.norm();
 }
 
-double
-computeInliers(const vector<Vector3d>& features1, // c1
-               const vector<Vector3d>& features2, // c2
-               const Matrix3d& R,                 // R_c1_c2
-               const Vector3d& t,                 // c1_t
-               const double reproj_thresh,
-               double error_multiplier2,
-               vector<Vector3d>& xyz_vec,         // in frame c1
-               vector<int>& inliers,
-               vector<int>& outliers)
+double computeInliers(const vector<Vector3d>& features1, // c1
+                      const vector<Vector3d>& features2, // c2
+                      const Matrix3d& R,                 // R_c1_c2
+                      const Vector3d& t,                 // c1_t
+                      const double reproj_thresh,
+                      double error_multiplier2,
+                      vector<Vector3d>& xyz_vec,         // in frame c1
+                      vector<int>& inliers,
+                      vector<int>& outliers)
 {
-  inliers.clear(); inliers.reserve(features1.size());
-  outliers.clear(); outliers.reserve(features1.size());
-  xyz_vec.clear(); xyz_vec.reserve(features1.size());
-  double tot_error = 0;
-  //triangulate all features and compute reprojection errors and inliers
-  for(size_t j=0; j<features1.size(); ++j)
-  {
-    xyz_vec.push_back(triangulateFeatureNonLin(R, t, features1[j], features2[j] ));
-    double e1 = reprojError(features1[j], xyz_vec.back(), error_multiplier2);
-    double e2 = reprojError(features2[j], R.transpose()*(xyz_vec.back()-t), error_multiplier2);
-    if(e1 > reproj_thresh || e2 > reproj_thresh)
-      outliers.push_back(j);
-    else
+    inliers.clear(); inliers.reserve(features1.size());
+    outliers.clear(); outliers.reserve(features1.size());
+    xyz_vec.clear(); xyz_vec.reserve(features1.size());
+    double tot_error = 0;
+    // triangulate all features and compute reprojection errors and inliers
+    for(size_t j=0; j<features1.size(); ++j)
     {
-      inliers.push_back(j);
-      tot_error += e1+e2;
+        xyz_vec.push_back(triangulateFeatureNonLin(R, t, features1[j], features2[j] ));
+        double e1 = reprojError(features1[j], xyz_vec.back(), error_multiplier2);
+        double e2 = reprojError(features2[j], R.transpose()*(xyz_vec.back()-t), error_multiplier2);
+        if(e1 > reproj_thresh || e2 > reproj_thresh)
+            outliers.push_back(j);
+        else
+        {
+            inliers.push_back(j);
+            tot_error += e1+e2;
+        }
     }
-  }
-  return tot_error;
+    return tot_error;
 }
 
 void
