@@ -59,43 +59,42 @@ InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur)
         inliers_, xyz_in_cur_, T_cur_from_ref_);
     SVO_INFO_STREAM("Init: Homography RANSAC "<<inliers_.size()<<" inliers.");
 
-    if(inliers_.size() < Config::initMinInliers())
+    if(inliers_.size() < Config::initMinInliers())  // initMinInliers default:40
     {
         SVO_WARN_STREAM("Init WARNING: "<<Config::initMinInliers()<<" inliers minimum required.");
         return FAILURE;
     }
 
-  // Rescale the map such that the mean scene depth is equal to the specified scale
-  vector<double> depth_vec;
-  for(size_t i=0; i<xyz_in_cur_.size(); ++i)
-    depth_vec.push_back((xyz_in_cur_[i]).z());
-  double scene_depth_median = vk::getMedian(depth_vec);
-  double scale = Config::mapScale()/scene_depth_median;
-  frame_cur->T_f_w_ = T_cur_from_ref_ * frame_ref_->T_f_w_;
-  frame_cur->T_f_w_.translation() =
-      -frame_cur->T_f_w_.rotation_matrix()*(frame_ref_->pos() + scale*(frame_cur->pos() - frame_ref_->pos()));
+    // Rescale the map such that the mean scene depth is equal to the specified scale
+    vector<double> depth_vec;
+    for(size_t i=0; i<xyz_in_cur_.size(); ++i)
+        depth_vec.push_back((xyz_in_cur_[i]).z());
+    double scene_depth_median = vk::getMedian(depth_vec);
+    double scale = Config::mapScale()/scene_depth_median;   // mapScale default:1
+    frame_cur->T_f_w_ = T_cur_from_ref_ * frame_ref_->T_f_w_;
+    frame_cur->T_f_w_.translation() = -frame_cur->T_f_w_.rotation_matrix()*(frame_ref_->pos() + scale*(frame_cur->pos() - frame_ref_->pos()));
 
-  // For each inlier create 3D point and add feature in both frames
-  SE3 T_world_cur = frame_cur->T_f_w_.inverse();
-  for(vector<int>::iterator it=inliers_.begin(); it!=inliers_.end(); ++it)
-  {
-    Vector2d px_cur(px_cur_[*it].x, px_cur_[*it].y);
-    Vector2d px_ref(px_ref_[*it].x, px_ref_[*it].y);
-    if(frame_ref_->cam_->isInFrame(px_cur.cast<int>(), 10) && frame_ref_->cam_->isInFrame(px_ref.cast<int>(), 10) && xyz_in_cur_[*it].z() > 0)
+    // For each inlier create 3D point and add feature in both frames
+    SE3 T_world_cur = frame_cur->T_f_w_.inverse();
+    for(vector<int>::iterator it=inliers_.begin(); it!=inliers_.end(); ++it)
     {
-      Vector3d pos = T_world_cur * (xyz_in_cur_[*it]*scale);
-      Point* new_point = new Point(pos);
+        Vector2d px_cur(px_cur_[*it].x, px_cur_[*it].y);
+        Vector2d px_ref(px_ref_[*it].x, px_ref_[*it].y);
+        if(frame_ref_->cam_->isInFrame(px_cur.cast<int>(), 10) && frame_ref_->cam_->isInFrame(px_ref.cast<int>(), 10) && xyz_in_cur_[*it].z() > 0)
+        {
+            Vector3d pos = T_world_cur * (xyz_in_cur_[*it]*scale);
+            Point* new_point = new Point(pos);
 
-      Feature* ftr_cur(new Feature(frame_cur.get(), new_point, px_cur, f_cur_[*it], 0));
-      frame_cur->addFeature(ftr_cur);
-      new_point->addFrameRef(ftr_cur);
+            Feature* ftr_cur(new Feature(frame_cur.get(), new_point, px_cur, f_cur_[*it], 0));
+            frame_cur->addFeature(ftr_cur);
+            new_point->addFrameRef(ftr_cur);
 
-      Feature* ftr_ref(new Feature(frame_ref_.get(), new_point, px_ref, f_ref_[*it], 0));
-      frame_ref_->addFeature(ftr_ref);
-      new_point->addFrameRef(ftr_ref);
+            Feature* ftr_ref(new Feature(frame_ref_.get(), new_point, px_ref, f_ref_[*it], 0));
+            frame_ref_->addFeature(ftr_ref);
+            new_point->addFrameRef(ftr_ref);
+        }
     }
-  }
-  return SUCCESS;
+    return SUCCESS;
 }
 
 void KltHomographyInit::reset()

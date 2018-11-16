@@ -69,15 +69,15 @@ void DepthFilter::startThread()
 
 void DepthFilter::stopThread()
 {
-  SVO_INFO_STREAM("DepthFilter stop thread invoked.");
-  if(thread_ != NULL)
-  {
-    SVO_INFO_STREAM("DepthFilter interrupt and join thread... ");
-    seeds_updating_halt_ = true;
-    thread_->interrupt();
-    thread_->join();
-    thread_ = NULL;
-  }
+    SVO_INFO_STREAM("DepthFilter stop thread invoked.");
+    if(thread_ != NULL)
+    {
+        SVO_INFO_STREAM("DepthFilter interrupt and join thread... ");
+        seeds_updating_halt_ = true;
+        thread_->interrupt();
+        thread_->join();
+        thread_ = NULL;
+    }
 }
 
 void DepthFilter::addFrame(FramePtr frame)
@@ -99,17 +99,17 @@ void DepthFilter::addFrame(FramePtr frame)
 
 void DepthFilter::addKeyframe(FramePtr frame, double depth_mean, double depth_min)
 {
-  new_keyframe_min_depth_ = depth_min;
-  new_keyframe_mean_depth_ = depth_mean;
-  if(thread_ != NULL)
-  {
-    new_keyframe_ = frame;
-    new_keyframe_set_ = true;
-    seeds_updating_halt_ = true;
-    frame_queue_cond_.notify_one();
-  }
-  else
-    initializeSeeds(frame);
+    new_keyframe_min_depth_ = depth_min;
+    new_keyframe_mean_depth_ = depth_mean;
+    if(thread_ != NULL)
+    {
+        new_keyframe_ = frame;
+        new_keyframe_set_ = true;
+        seeds_updating_halt_ = true;
+        frame_queue_cond_.notify_one();
+    }
+    else
+        initializeSeeds(frame);
 }
 
 void DepthFilter::initializeSeeds(FramePtr frame)
@@ -169,30 +169,30 @@ void DepthFilter::reset()
 
 void DepthFilter::updateSeedsLoop()
 {
-  while(!boost::this_thread::interruption_requested())
-  {
-    FramePtr frame;
+    while(!boost::this_thread::interruption_requested())
     {
-      lock_t lock(frame_queue_mut_);
-      while(frame_queue_.empty() && new_keyframe_set_ == false)
-        frame_queue_cond_.wait(lock);
-      if(new_keyframe_set_)
-      {
-        new_keyframe_set_ = false;
-        seeds_updating_halt_ = false;
-        clearFrameQueue();
-        frame = new_keyframe_;
-      }
-      else
-      {
-        frame = frame_queue_.front();
-        frame_queue_.pop();
-      }
+        FramePtr frame;
+        {
+            lock_t lock(frame_queue_mut_);
+            while(frame_queue_.empty() && new_keyframe_set_ == false)
+                frame_queue_cond_.wait(lock);
+            if(new_keyframe_set_)
+            {
+                new_keyframe_set_ = false;
+                seeds_updating_halt_ = false;
+                clearFrameQueue();
+                frame = new_keyframe_;
+            }
+            else
+            {
+                frame = frame_queue_.front();
+                frame_queue_.pop();
+            }
+        }
+        updateSeeds(frame);
+        if(frame->isKeyframe())
+            initializeSeeds(frame);
     }
-    updateSeeds(frame);
-    if(frame->isKeyframe())
-      initializeSeeds(frame);
-  }
 }
 
 void DepthFilter::updateSeeds(FramePtr frame)
