@@ -65,10 +65,10 @@ void Point::addFrameRef(Feature* ftr)
 
 Feature* Point::findFrameRef(Frame* frame)
 {
-  for(auto it=obs_.begin(), ite=obs_.end(); it!=ite; ++it)
-    if((*it)->frame == frame)
-      return *it;
-  return NULL;    // no keyframe found
+    for(auto it=obs_.begin(), ite=obs_.end(); it!=ite; ++it)
+        if((*it)->frame == frame)
+            return *it;
+    return NULL;    // no keyframe found
 }
 
 bool Point::deleteFrameRef(Frame* frame)

@@ -136,15 +136,15 @@ void Frame::checkKeyPoints(Feature* ftr)
 
 void Frame::removeKeyPoint(Feature* ftr)
 {
-  bool found = false;
-  std::for_each(key_pts_.begin(), key_pts_.end(), [&](Feature*& i){
-    if(i == ftr) {
-      i = NULL;
-      found = true;
-    }
-  });
-  if(found)
-    setKeyPoints();
+    bool found = false;
+    std::for_each(key_pts_.begin(), key_pts_.end(), [&](Feature*& i){
+        if(i == ftr) {
+            i = NULL;
+            found = true;
+        }
+    });
+    if(found)
+        setKeyPoints();
 }
 
 bool Frame::isVisible(const Vector3d& xyz_w) const

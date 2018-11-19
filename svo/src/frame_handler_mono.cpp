@@ -121,7 +121,7 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
 
     // two-frame bundle adjustment
 #ifdef USE_BUNDLE_ADJUSTMENT
-    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);
+    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);    // lobaThresh default:2.0f
 #endif
 
     map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.

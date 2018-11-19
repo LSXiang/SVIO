@@ -81,21 +81,21 @@ void Map::removePtFrameRef(Frame* frame, Feature* ftr)
 
 void Map::safeDeletePoint(Point* pt)
 {
-  // Delete references to mappoints in all keyframes
-  std::for_each(pt->obs_.begin(), pt->obs_.end(), [&](Feature* ftr){
-    ftr->point=NULL;
-    ftr->frame->removeKeyPoint(ftr);
-  });
-  pt->obs_.clear();
+    // Delete references to mappoints in all keyframes
+    std::for_each(pt->obs_.begin(), pt->obs_.end(), [&](Feature* ftr){
+        ftr->point=NULL;
+        ftr->frame->removeKeyPoint(ftr);
+    });
+    pt->obs_.clear();
 
-  // Delete mappoint
-  deletePoint(pt);
+    // Delete mappoint
+    deletePoint(pt);
 }
 
 void Map::deletePoint(Point* pt)
 {
-  pt->type_ = Point::TYPE_DELETED;
-  trash_points_.push_back(pt);
+    pt->type_ = Point::TYPE_DELETED;
+    trash_points_.push_back(pt);
 }
 
 void Map::addKeyframe(FramePtr new_keyframe)

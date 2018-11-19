@@ -44,79 +44,79 @@ void twoViewBA(
     double reproj_thresh,
     Map* map)
 {
-  // scale reprojection threshold in pixels to unit plane
-  reproj_thresh /= frame1->cam_->errorMultiplier2();
+    // scale reprojection threshold in pixels to unit plane
+    reproj_thresh /= frame1->cam_->errorMultiplier2();
 
-  // init g2o
-  g2o::SparseOptimizer optimizer;
-  setupG2o(&optimizer);
+    // init g2o
+    g2o::SparseOptimizer optimizer;
+    setupG2o(&optimizer);
 
-  list<EdgeContainerSE3> edges;
-  size_t v_id = 0;
+    list<EdgeContainerSE3> edges;
+    size_t v_id = 0;
 
-  // New Keyframe Vertex 1: This Keyframe is set to fixed!
-  g2oFrameSE3* v_frame1 = createG2oFrameSE3(frame1, v_id++, true);
-  optimizer.addVertex(v_frame1);
+    // New Keyframe Vertex 1: This Keyframe is set to fixed!  this pose of the current keyframe is compute via KLT_Track, so, be set to fixed.
+    g2oFrameSE3* v_frame1 = createG2oFrameSE3(frame1, v_id++, true);
+    optimizer.addVertex(v_frame1);
 
-  // New Keyframe Vertex 2
-  g2oFrameSE3* v_frame2 = createG2oFrameSE3(frame2, v_id++, false);
-  optimizer.addVertex(v_frame2);
+    // New Keyframe Vertex 2
+    g2oFrameSE3* v_frame2 = createG2oFrameSE3(frame2, v_id++, false);
+    optimizer.addVertex(v_frame2);
 
-  // Create Point Vertices
-  for(Features::iterator it_ftr=frame1->fts_.begin(); it_ftr!=frame1->fts_.end(); ++it_ftr)
-  {
-    Point* pt = (*it_ftr)->point;
-    if(pt == NULL)
-      continue;
-    g2oPoint* v_pt = createG2oPoint(pt->pos_, v_id++, false);
-    optimizer.addVertex(v_pt);
-    pt->v_pt_ = v_pt;
-    g2oEdgeSE3* e = createG2oEdgeSE3(v_frame1, v_pt, vk::project2d((*it_ftr)->f), true, reproj_thresh*Config::lobaRobustHuberWidth());
-    optimizer.addEdge(e);
-    edges.push_back(EdgeContainerSE3(e, frame1, *it_ftr)); // TODO feature now links to frame, so we can simplify edge container!
-
-    // find at which index the second frame observes the point
-    Feature* ftr_frame2 = pt->findFrameRef(frame2);
-    e = createG2oEdgeSE3(v_frame2, v_pt, vk::project2d(ftr_frame2->f), true, reproj_thresh*Config::lobaRobustHuberWidth());
-    optimizer.addEdge(e);
-    edges.push_back(EdgeContainerSE3(e, frame2, ftr_frame2));
-  }
-
-  // Optimization
-  double init_error, final_error;
-  runSparseBAOptimizer(&optimizer, Config::lobaNumIter(), init_error, final_error);
-  printf("2-View BA: Error before/after = %f / %f\n", init_error, final_error);
-
-  // Update Keyframe Positions
-  frame1->T_f_w_.rotation_matrix() = v_frame1->estimate().rotation().toRotationMatrix();
-  frame1->T_f_w_.translation() = v_frame1->estimate().translation();
-  frame2->T_f_w_.rotation_matrix() = v_frame2->estimate().rotation().toRotationMatrix();
-  frame2->T_f_w_.translation() = v_frame2->estimate().translation();
-
-  // Update Mappoint Positions
-  for(Features::iterator it=frame1->fts_.begin(); it!=frame1->fts_.end(); ++it)
-  {
-    if((*it)->point == NULL)
-     continue;
-    (*it)->point->pos_ = (*it)->point->v_pt_->estimate();
-    (*it)->point->v_pt_ = NULL;
-  }
-
-  // Find Mappoints with too large reprojection error
-  const double reproj_thresh_squared = reproj_thresh*reproj_thresh;
-  size_t n_incorrect_edges = 0;
-  for(list<EdgeContainerSE3>::iterator it_e = edges.begin(); it_e != edges.end(); ++it_e)
-    if(it_e->edge->chi2() > reproj_thresh_squared)
+    // Create Point Vertices
+    for(Features::iterator it_ftr=frame1->fts_.begin(); it_ftr!=frame1->fts_.end(); ++it_ftr)
     {
-      if(it_e->feature->point != NULL)
-      {
-        map->safeDeletePoint(it_e->feature->point);
-        it_e->feature->point = NULL;
-      }
-      ++n_incorrect_edges;
+        Point* pt = (*it_ftr)->point;
+        if (pt == NULL)
+            continue;
+        g2oPoint* v_pt = createG2oPoint(pt->pos_, v_id++, false);
+        optimizer.addVertex(v_pt);
+        pt->v_pt_ = v_pt;
+        g2oEdgeSE3* e = createG2oEdgeSE3(v_frame1, v_pt, vk::project2d((*it_ftr)->f), true, reproj_thresh*Config::lobaRobustHuberWidth());  // lobaRobustHuberWidth default:1.0
+        optimizer.addEdge(e);
+        edges.push_back(EdgeContainerSE3(e, frame1, *it_ftr));  // TODO feature now links to frame, so we can simplify edge container!
+
+        // find at which index the second frame observes the point
+        Feature* ftr_frame2 = pt->findFrameRef(frame2);
+        e = createG2oEdgeSE3(v_frame2, v_pt, vk::project2d(ftr_frame2->f), true, reproj_thresh*Config::lobaRobustHuberWidth());
+        optimizer.addEdge(e);
+        edges.push_back(EdgeContainerSE3(e, frame2, ftr_frame2));
     }
 
-  printf("2-View BA: Wrong edges =  %zu\n", n_incorrect_edges);
+    // Optimization
+    double init_error, final_error;
+    runSparseBAOptimizer(&optimizer, Config::lobaNumIter(), init_error, final_error);   // lobaNumIter: vo_fast.yaml->0, vo_accurate->10
+    printf("2-View BA: Error before/after = %f / %f\n", init_error, final_error);
+
+    // Update Keyframe Positions
+    frame1->T_f_w_.rotation_matrix() = v_frame1->estimate().rotation().toRotationMatrix();
+    frame1->T_f_w_.translation() = v_frame1->estimate().translation();
+    frame2->T_f_w_.rotation_matrix() = v_frame2->estimate().rotation().toRotationMatrix();
+    frame2->T_f_w_.translation() = v_frame2->estimate().translation();
+
+    // Update Mappoint Positions
+    for(Features::iterator it=frame1->fts_.begin(); it!=frame1->fts_.end(); ++it)
+    {
+        if((*it)->point == NULL)
+            continue;
+        (*it)->point->pos_ = (*it)->point->v_pt_->estimate();
+        (*it)->point->v_pt_ = NULL;
+    }
+
+    // Find Mappoints with too large reprojection error
+    const double reproj_thresh_squared = reproj_thresh*reproj_thresh;
+    size_t n_incorrect_edges = 0;
+    for(list<EdgeContainerSE3>::iterator it_e = edges.begin(); it_e != edges.end(); ++it_e)
+        if(it_e->edge->chi2() > reproj_thresh_squared)
+        {
+            if(it_e->feature->point != NULL)
+            {
+                map->safeDeletePoint(it_e->feature->point);
+                it_e->feature->point = NULL;
+            }
+            ++n_incorrect_edges;
+        }
+
+    printf("2-View BA: Wrong edges =  %zu\n", n_incorrect_edges);
 }
 
 void localBA(
@@ -348,89 +348,87 @@ void setupG2o(g2o::SparseOptimizer * optimizer)
   optimizer->setVerbose(false);
 
 #if SCHUR_TRICK
-  // solver
-  g2o::BlockSolver_6_3::LinearSolverType* linearSolver;
-  linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>();
-  //linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolver_6_3::PoseMatrixType>();
+    // solver
+    g2o::BlockSolver_6_3::LinearSolverType* linearSolver;
+    linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>();
+    //linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolver_6_3::PoseMatrixType>();
 
-//   g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-  g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType>(linearSolver));
-//   g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-  g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(std::unique_ptr<g2o::BlockSolver_6_3>(solver_ptr));
+//     g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);                          // if you used version of G2O before /tags/20160424_git,
+//     g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);  // then, you can used this codes.
+    g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType>(linearSolver));
+    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(std::unique_ptr<g2o::BlockSolver_6_3>(solver_ptr));
 #else
-  g2o::BlockSolverX::LinearSolverType * linearSolver;
-  linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>();
-  //linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>();
-  g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-  g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    g2o::BlockSolverX::LinearSolverType * linearSolver;
+    linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>();
+    //linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>();
+    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 #endif
 
-  solver->setMaxTrialsAfterFailure(5);
-  optimizer->setAlgorithm(solver);
+    solver->setMaxTrialsAfterFailure(5);
+    optimizer->setAlgorithm(solver);
 
-  // setup camera
-  g2o::CameraParameters * cam_params = new g2o::CameraParameters(1.0, Vector2d(0.,0.), 0.);
-  cam_params->setId(0);
-  if (!optimizer->addParameter(cam_params)) {
-    assert(false);
-  }
+    // setup camera
+    //!< Note, we set reproject the 3d point in space to unit plane during the G2O optimization, so camera internal matrix is I.
+    g2o::CameraParameters * cam_params = new g2o::CameraParameters(1.0, Vector2d(0.,0.), 0.);
+    cam_params->setId(0);
+    if (!optimizer->addParameter(cam_params))
+    {
+        assert(false);
+    }
 }
 
-void
-runSparseBAOptimizer(g2o::SparseOptimizer* optimizer,
-                     unsigned int num_iter,
-                     double& init_error, double& final_error)
+void runSparseBAOptimizer(g2o::SparseOptimizer* optimizer,
+                          unsigned int num_iter,
+                          double& init_error, double& final_error)
 {
-  optimizer->initializeOptimization();
-  optimizer->computeActiveErrors();
-  init_error = optimizer->activeChi2();
-  optimizer->optimize(num_iter);
-  final_error = optimizer->activeChi2();
+    optimizer->initializeOptimization();
+    optimizer->computeActiveErrors();
+    init_error = optimizer->activeChi2();
+    optimizer->optimize(num_iter);
+    final_error = optimizer->activeChi2();
 }
 
-g2oFrameSE3*
-createG2oFrameSE3(Frame* frame, size_t id, bool fixed)
+g2oFrameSE3* createG2oFrameSE3(Frame* frame, size_t id, bool fixed)
 {
-  g2oFrameSE3* v = new g2oFrameSE3();
-  v->setId(id);
-  v->setFixed(fixed);
-  v->setEstimate(g2o::SE3Quat(frame->T_f_w_.unit_quaternion(), frame->T_f_w_.translation()));
-  return v;
+    g2oFrameSE3* v = new g2oFrameSE3();
+    v->setId(id);
+    v->setFixed(fixed);
+    v->setEstimate(g2o::SE3Quat(frame->T_f_w_.unit_quaternion(), frame->T_f_w_.translation()));
+    return v;
 }
 
-g2oPoint*
-createG2oPoint(Vector3d pos,
-               size_t id,
-               bool fixed)
+g2oPoint* createG2oPoint(Vector3d pos,
+                         size_t id,
+                         bool fixed)
 {
-  g2oPoint* v = new g2oPoint();
-  v->setId(id);
+    g2oPoint* v = new g2oPoint();
+    v->setId(id);
 #if SCHUR_TRICK
-  v->setMarginalized(true);
+    v->setMarginalized(true);
 #endif
-  v->setFixed(fixed);
-  v->setEstimate(pos);
-  return v;
+    v->setFixed(fixed);
+    v->setEstimate(pos);
+    return v;
 }
 
-g2oEdgeSE3*
-createG2oEdgeSE3( g2oFrameSE3* v_frame,
-                  g2oPoint* v_point,
-                  const Vector2d& f_up,
-                  bool robust_kernel,
-                  double huber_width,
-                  double weight)
+g2oEdgeSE3* createG2oEdgeSE3(g2oFrameSE3* v_frame, 
+                             g2oPoint* v_point,
+                             const Vector2d& f_up,
+                             bool robust_kernel,
+                             double huber_width,
+                             double weight)
 {
-  g2oEdgeSE3* e = new g2oEdgeSE3();
-  e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(v_point));
-  e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(v_frame));
-  e->setMeasurement(f_up);
-  e->information() = weight * Eigen::Matrix2d::Identity(2,2);
-  g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber();      // TODO: memory leak
-  rk->setDelta(huber_width);
-  e->setRobustKernel(rk);
-  e->setParameterId(0, 0); //old: e->setId(v_point->id());
-  return e;
+    g2oEdgeSE3* e = new g2oEdgeSE3();
+    e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(v_point));
+    e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(v_frame));
+    e->setMeasurement(f_up);
+    e->information() = weight * Eigen::Matrix2d::Identity(2,2);
+    g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber();      // TODO: memory leak
+    rk->setDelta(huber_width);
+    e->setRobustKernel(rk);
+    e->setParameterId(0, 0); //old: e->setId(v_point->id());
+    return e;
 }
 
 } // namespace ba
