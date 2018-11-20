@@ -12,13 +12,21 @@
 
 #include <stdexcept>
 
+/**
+ * Nonlinear Least-Square Solver
+ * reference: 
+ *   An Invitation to 3D Compute Vision P.479~484
+ *   Multiple View Geometry in Computer Vision (Second Edition) P.597~627
+ *   《视觉SLAM十四讲：从理论到实践》 P.
+ */
+
 template <int D, typename T>
 void vk::NLLSSolver<D, T>::optimize(ModelType& model)
 {
-  if(method_ == GaussNewton)
-    optimizeGaussNewton(model);
-  else if(method_ == LevenbergMarquardt)
-    optimizeLevenbergMarquardt(model);
+    if(method_ == GaussNewton)
+        optimizeGaussNewton(model);
+    else if(method_ == LevenbergMarquardt)
+        optimizeLevenbergMarquardt(model);
 }
 
 template <int D, typename T>
@@ -298,14 +306,14 @@ void vk::NLLSSolver<D, T>::setPrior(
 template <int D, typename T>
 void vk::NLLSSolver<D, T>::reset()
 {
-  have_prior_ = false;
-  chi2_ = 1e10;
-  mu_ = mu_init_;
-  nu_ = nu_init_;
-  n_meas_ = 0;
-  n_iter_ = n_iter_init_;
-  iter_ = 0;
-  stop_ = false;
+    have_prior_ = false;
+    chi2_ = 1e10;
+    mu_ = mu_init_;
+    nu_ = nu_init_;
+    n_meas_ = 0;
+    n_iter_ = n_iter_init_;
+    iter_ = 0;
+    stop_ = false;
 }
 
 template <int D, typename T>
