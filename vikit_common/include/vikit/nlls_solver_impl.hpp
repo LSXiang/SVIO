@@ -17,7 +17,7 @@
  * reference: 
  *   An Invitation to 3D Compute Vision P.479~484
  *   Multiple View Geometry in Computer Vision (Second Edition) P.597~627
- *   《视觉SLAM十四讲：从理论到实践》 P.
+ *   《视觉SLAM十四讲：从理论到实践》 P.108~115
  */
 
 template <int D, typename T>
@@ -29,82 +29,88 @@ void vk::NLLSSolver<D, T>::optimize(ModelType& model)
         optimizeLevenbergMarquardt(model);
 }
 
+/**
+ * Gauss-Newton method
+ * 
+ * f(x) ~= f(x) + J(x)∆x + 1/2(∆x^T)H(∆x)
+ * 
+ */
 template <int D, typename T>
 void vk::NLLSSolver<D, T>::optimizeGaussNewton(ModelType& model)
 {
-  // Compute weight scale
-  if(use_weights_)
-    computeResiduals(model, false, true);
+    // Compute weight scale
+    if(use_weights_)
+        computeResiduals(model, false, true);
 
-  // Save the old model to rollback in case of unsuccessful update
-  ModelType old_model(model);
+    // Save the old model to rollback in case of unsuccessful update
+    ModelType old_model(model);
 
-  // perform iterative estimation
-  for (iter_ = 0; iter_<n_iter_; ++iter_)
-  {
-    rho_ = 0;
-    startIteration();
-
-    H_.setZero();
-    Jres_.setZero();
-
-    // compute initial error
-    n_meas_ = 0;
-    double new_chi2 = computeResiduals(model, true, false);
-
-    // add prior
-    if(have_prior_)
-      applyPrior(model);
-
-    // solve the linear system
-    if(!solve())
+    // perform iterative estimation
+    for (iter_ = 0; iter_<n_iter_; ++iter_)
     {
-      // matrix was singular and could not be computed
-      std::cout << "Matrix is close to singular! Stop Optimizing." << std::endl;
-      std::cout << "H = " << H_ << std::endl;
-      std::cout << "Jres = " << Jres_ << std::endl;
-      stop_ = true;
+        rho_ = 0;
+        startIteration();
+
+        H_.setZero();
+        Jres_.setZero();
+
+        // compute initial error
+        n_meas_ = 0;
+        double new_chi2 = computeResiduals(model, true, false);
+
+        // add prior
+        if(have_prior_)
+            applyPrior(model);
+
+        // solve the linear system
+        if(!solve())
+        {
+            // matrix was singular and could not be computed
+            std::cout << "Matrix is close to singular! Stop Optimizing." << std::endl;
+            std::cout << "H = " << H_ << std::endl;
+            std::cout << "Jres = " << Jres_ << std::endl;
+            stop_ = true;
+        }
+
+        // check if error increased since last optimization
+        if((iter_ > 0 && new_chi2 > chi2_) || stop_)
+        {
+            if(verbose_)
+            {
+                std::cout << "It. " << iter_
+                    << "\t Failure"
+                    << "\t new_chi2 = " << new_chi2
+                    << "\t Error increased. Stop optimizing."
+                    << std::endl;
+            }
+            model = old_model; // rollback
+            break;
+        }
+
+        // update the model
+        ModelType new_model;
+        update(model, new_model);
+        old_model = model;
+        model = new_model;
+
+        chi2_ = new_chi2;
+
+        if(verbose_)
+        {
+            std::cout << "It. " << iter_
+            << "\t Success"
+            << "\t new_chi2 = " << new_chi2
+            << "\t n_meas = " << n_meas_
+            << "\t x_norm = " << vk::norm_max(x_)
+            << std::endl;
+        }
+
+        finishIteration();
+
+        // stop when converged, i.e. update step too small
+        if(vk::norm_max(x_)<=eps_)
+            break;
     }
-
-    // check if error increased since last optimization
-    if((iter_ > 0 && new_chi2 > chi2_) || stop_)
-    {
-      if(verbose_)
-      {
-        std::cout << "It. " << iter_
-                  << "\t Failure"
-                  << "\t new_chi2 = " << new_chi2
-                  << "\t Error increased. Stop optimizing."
-                  << std::endl;
-      }
-      model = old_model; // rollback
-      break;
-    }
-
-    // update the model
-    ModelType new_model;
-    update(model, new_model);
-    old_model = model;
-    model = new_model;
-
-    chi2_ = new_chi2;
-
-    if(verbose_)
-    {
-      std::cout << "It. " << iter_
-                << "\t Success"
-                << "\t new_chi2 = " << new_chi2
-                << "\t n_meas = " << n_meas_
-                << "\t x_norm = " << vk::norm_max(x_)
-                << std::endl;
-    }
-
-    finishIteration();
-
-    // stop when converged, i.e. update step too small
-    if(vk::norm_max(x_)<=eps_)
-      break;
-  }
 }
 
 template <int D, typename T>
