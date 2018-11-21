@@ -18,6 +18,30 @@
  *   An Invitation to 3D Compute Vision P.479~484
  *   Multiple View Geometry in Computer Vision (Second Edition) P.597~627
  *   《视觉SLAM十四讲：从理论到实践》 P.108~115
+ * 
+ * find min_x[ f(*) ]
+ *   f(x) = f(x) + (J^T)(∆x) + 1/2(∆x^T)H(∆x) + ... [Taylor expansion at x_i, where ∆x = x - x_i]
+ * the function f(*) approximately resembles a quadratic function
+ *   f(x) ~= f(x_i) + (J^T)( x-x_i ) + 1/2( ( x-x_i )^T )H( x-x_i )
+ * where, J and H is jacobian matrix and Hessian matrix at x
+ * Necessary optimality conditions is
+ *   J = 0, H > 0
+ * partial differential equation, we can obtain
+ *   J + H( x-x_i ) = 0
+ * this gives Newton's method
+ *   x_i+1 = x_i - H^(-1)J
+ * 
+ * Gauss-Newton method use only the information encoded in the first derivative of f(x). so,
+ *   f(x) ~= f(x) + (J^T)(∆x)
+ * then, compute 
+ *   min_x[ ||f(x)||^2 ] = min_x[ ((f(x) + (J^T)(∆x))^T)(f(x) + (J^T)(∆x)) ]
+ * have, 
+ *   min_x[ 1/2( |f(x)|^2 + 2(J^T)f(x)(∆x) + (∆x^T)(J^T)J(∆x) ) ]
+ * partial differential equation for ∆x, we can obtain
+ *   J(J^T)(∆x) = -(J^T)f(x)
+ * The essence of the Gauss-Newton method is approximate Hessian matrix to J(J^T)
+ * 
+ * Levenberg-Marquard method is base on Gauss-Newton method, that is approximate Hessian matrix to [ lambda*I + J(J^T) ]
  */
 
 template <int D, typename T>
@@ -29,12 +53,6 @@ void vk::NLLSSolver<D, T>::optimize(ModelType& model)
         optimizeLevenbergMarquardt(model);
 }
 
-/**
- * Gauss-Newton method
- * 
- * f(x) ~= f(x) + J(x)∆x + 1/2(∆x^T)H(∆x)
- * 
- */
 template <int D, typename T>
 void vk::NLLSSolver<D, T>::optimizeGaussNewton(ModelType& model)
 {
