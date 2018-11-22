@@ -41,18 +41,19 @@ void AbstractDetector::resetGrid()
 
 void AbstractDetector::setExistingFeatures(const Features& fts)
 {
-  std::for_each(fts.begin(), fts.end(), [&](Feature* i){
+    //!< set a flag for which grid the feature points locate in
+    std::for_each(fts.begin(), fts.end(), [&](Feature* i){
     grid_occupancy_.at(
         static_cast<int>(i->px[1]/cell_size_)*grid_n_cols_
         + static_cast<int>(i->px[0]/cell_size_)) = true;
-  });
+    });
 }
 
 void AbstractDetector::setGridOccpuancy(const Vector2d& px)
 {
-  grid_occupancy_.at(
-      static_cast<int>(px[1]/cell_size_)*grid_n_cols_
-    + static_cast<int>(px[0]/cell_size_)) = true;
+    grid_occupancy_.at(
+        static_cast<int>(px[1]/cell_size_)*grid_n_cols_
+        + static_cast<int>(px[0]/cell_size_)) = true;
 }
 
 FastDetector::FastDetector(
