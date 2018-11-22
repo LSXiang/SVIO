@@ -114,22 +114,23 @@ void DepthFilter::addKeyframe(FramePtr frame, double depth_mean, double depth_mi
 
 void DepthFilter::initializeSeeds(FramePtr frame)
 {
-  Features new_features;
-  feature_detector_->setExistingFeatures(frame->fts_);
-  feature_detector_->detect(frame.get(), frame->img_pyr_,
-                            Config::triangMinCornerScore(), new_features);
+    //<! only detect feature in empty grid
+    Features new_features;
+    feature_detector_->setExistingFeatures(frame->fts_);
+    feature_detector_->detect(frame.get(), frame->img_pyr_,
+                              Config::triangMinCornerScore(), new_features); // triangMinCornerScore default:20.O
 
-  // initialize a seed for every new feature
-  seeds_updating_halt_ = true;
-  lock_t lock(seeds_mut_); // by locking the updateSeeds function stops
-  ++Seed::batch_counter;
-  std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
-    seeds_.push_back(Seed(ftr, new_keyframe_mean_depth_, new_keyframe_min_depth_));
-  });
+    // initialize a seed for every new feature
+    seeds_updating_halt_ = true;
+    lock_t lock(seeds_mut_); // by locking the updateSeeds function stops
+    ++Seed::batch_counter;
+    std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
+        seeds_.push_back(Seed(ftr, new_keyframe_mean_depth_, new_keyframe_min_depth_));
+    });
 
-  if(options_.verbose)
-    SVO_INFO_STREAM("DepthFilter: Initialized "<<new_features.size()<<" new seeds");
-  seeds_updating_halt_ = false;
+    if(options_.verbose)
+        SVO_INFO_STREAM("DepthFilter: Initialized "<<new_features.size()<<" new seeds");
+    seeds_updating_halt_ = false;
 }
 
 void DepthFilter::removeKeyframe(FramePtr frame)
@@ -197,104 +198,107 @@ void DepthFilter::updateSeedsLoop()
 
 void DepthFilter::updateSeeds(FramePtr frame)
 {
-  // update only a limited number of seeds, because we don't have time to do it
-  // for all the seeds in every frame!
-  size_t n_updates=0, n_failed_matches=0, n_seeds = seeds_.size();
-  lock_t lock(seeds_mut_);
-  std::list<Seed>::iterator it=seeds_.begin();
+    // update only a limited number of seeds, because we don't have time to do it
+    // for all the seeds in every frame!
+    size_t n_updates=0, n_failed_matches=0, n_seeds = seeds_.size();
+    lock_t lock(seeds_mut_);
+    std::list<Seed>::iterator it=seeds_.begin();
 
-  const double focal_length = frame->cam_->errorMultiplier2();
-  double px_noise = 1.0;
-  double px_error_angle = atan(px_noise/(2.0*focal_length))*2.0; // law of chord (sehnensatz)
+    const double focal_length = frame->cam_->errorMultiplier2();
+    double px_noise = 1.0;
+    double px_error_angle = atan(px_noise/(2.0*focal_length))*2.0; // law of chord (sehnensatz)
 
-  while( it!=seeds_.end())
-  {
-    // set this value true when seeds updating should be interrupted
-    if(seeds_updating_halt_)
-      return;
-
-    // check if seed is not already too old
-    if((Seed::batch_counter - it->batch_id) > options_.max_n_kfs) {
-      it = seeds_.erase(it);
-      continue;
-    }
-
-    // check if point is visible in the current image
-    SE3 T_ref_cur = it->ftr->frame->T_f_w_ * frame->T_f_w_.inverse();
-    const Vector3d xyz_f(T_ref_cur.inverse()*(1.0/it->mu * it->ftr->f) );
-    if(xyz_f.z() < 0.0)  {
-      ++it; // behind the camera
-      continue;
-    }
-    if(!frame->cam_->isInFrame(frame->f2c(xyz_f).cast<int>())) {
-      ++it; // point does not project in image
-      continue;
-    }
-
-    // we are using inverse depth coordinates
-    float z_inv_min = it->mu + sqrt(it->sigma2);
-    float z_inv_max = max(it->mu - sqrt(it->sigma2), 0.00000001f);
-    double z;
-    if(!matcher_.findEpipolarMatchDirect(
-        *it->ftr->frame, *frame, *it->ftr, 1.0/it->mu, 1.0/z_inv_min, 1.0/z_inv_max, z))
+    while( it!=seeds_.end())
     {
-      it->b++; // increase outlier probability when no match was found
-      ++it;
-      ++n_failed_matches;
-      continue;
-    }
+        // set this value true when seeds updating should be interrupted
+        if (seeds_updating_halt_)
+            return;
 
-    // compute tau
-    double tau = computeTau(T_ref_cur, it->ftr->f, z, px_error_angle);
-    double tau_inverse = 0.5 * (1.0/max(0.0000001, z-tau) - 1.0/(z+tau));
+        // check if seed is not already too old
+        if ((Seed::batch_counter - it->batch_id) > options_.max_n_kfs)
+        {
+            it = seeds_.erase(it);
+            continue;
+        }
 
-    // update the estimate
-    updateSeed(1./z, tau_inverse*tau_inverse, &*it);
-    ++n_updates;
+        // check if point is visible in the current image
+        SE3 T_ref_cur = it->ftr->frame->T_f_w_ * frame->T_f_w_.inverse();
+        const Vector3d xyz_f(T_ref_cur.inverse()*(1.0/it->mu * it->ftr->f) );
+        if (xyz_f.z() < 0.0)
+        {
+            ++it; // behind the camera
+            continue;
+        }
+        if (!frame->cam_->isInFrame(frame->f2c(xyz_f).cast<int>()))
+        {
+            ++it; // point does not project in image
+            continue;
+        }
 
-    if(frame->isKeyframe())
-    {
-      // The feature detector should not initialize new seeds close to this location
-      feature_detector_->setGridOccpuancy(matcher_.px_cur_);
-    }
+        // we are using inverse depth coordinates
+        float z_inv_min = it->mu + sqrt(it->sigma2);
+        float z_inv_max = max(it->mu - sqrt(it->sigma2), 0.00000001f);
+        double z;
+        if(!matcher_.findEpipolarMatchDirect(
+            *it->ftr->frame, *frame, *it->ftr, 1.0/it->mu, 1.0/z_inv_min, 1.0/z_inv_max, z))
+        {
+            it->b++; // increase outlier probability when no match was found
+            ++it;
+            ++n_failed_matches;
+            continue;
+        }
 
-    // if the seed has converged, we initialize a new candidate point and remove the seed
-    if(sqrt(it->sigma2) < it->z_range/options_.seed_convergence_sigma2_thresh)
-    {
-      assert(it->ftr->point == NULL); // TODO this should not happen anymore
-      Vector3d xyz_world(it->ftr->frame->T_f_w_.inverse() * (it->ftr->f * (1.0/it->mu)));
-      Point* point = new Point(xyz_world, it->ftr);
-      it->ftr->point = point;
-      /* FIXME it is not threadsafe to add a feature to the frame here.
-      if(frame->isKeyframe())
-      {
-        Feature* ftr = new Feature(frame.get(), matcher_.px_cur_, matcher_.search_level_);
-        ftr->point = point;
-        point->addFrameRef(ftr);
-        frame->addFeature(ftr);
-        it->ftr->frame->addFeature(it->ftr);
-      }
-      else
-      */
-      {
-        seed_converged_cb_(point, it->sigma2); // put in candidate list
-      }
-      it = seeds_.erase(it);
+        // compute tau
+        double tau = computeTau(T_ref_cur, it->ftr->f, z, px_error_angle);
+        double tau_inverse = 0.5 * (1.0/max(0.0000001, z-tau) - 1.0/(z+tau));
+
+        // update the estimate
+        updateSeed(1./z, tau_inverse*tau_inverse, &*it);
+        ++n_updates;
+
+        if (frame->isKeyframe())
+        {
+            // The feature detector should not initialize new seeds close to this location
+            feature_detector_->setGridOccpuancy(matcher_.px_cur_);
+        }
+
+        // if the seed has converged, we initialize a new candidate point and remove the seed
+        if (sqrt(it->sigma2) < it->z_range/options_.seed_convergence_sigma2_thresh)
+        {
+            assert(it->ftr->point == NULL); // TODO this should not happen anymore
+            Vector3d xyz_world(it->ftr->frame->T_f_w_.inverse() * (it->ftr->f * (1.0/it->mu)));
+            Point* point = new Point(xyz_world, it->ftr);
+            it->ftr->point = point;
+            /* FIXME it is not threadsafe to add a feature to the frame here.
+            if(frame->isKeyframe())
+            {
+                Feature* ftr = new Feature(frame.get(), matcher_.px_cur_, matcher_.search_level_);
+                ftr->point = point;
+                point->addFrameRef(ftr);
+                frame->addFeature(ftr);
+                it->ftr->frame->addFeature(it->ftr);
+            }
+            else
+            */
+            {
+                seed_converged_cb_(point, it->sigma2); // put in candidate list
+            }
+            it = seeds_.erase(it);
+        }
+        else if (isnan(z_inv_min))
+        {
+            SVO_WARN_STREAM("z_min is NaN");
+            it = seeds_.erase(it);
+        }
+        else
+            ++it;
     }
-    else if(isnan(z_inv_min))
-    {
-      SVO_WARN_STREAM("z_min is NaN");
-      it = seeds_.erase(it);
-    }
-    else
-      ++it;
-  }
 }
 
 void DepthFilter::clearFrameQueue()
 {
-  while(!frame_queue_.empty())
-    frame_queue_.pop();
+    while(!frame_queue_.empty())
+        frame_queue_.pop();
 }
 
 void DepthFilter::getSeedsCopy(const FramePtr& frame, std::list<Seed>& seeds)
@@ -333,21 +337,21 @@ void DepthFilter::updateSeed(const float x, const float tau2, Seed* seed)
 }
 
 double DepthFilter::computeTau(
-      const SE3& T_ref_cur,
-      const Vector3d& f,
-      const double z,
-      const double px_error_angle)
+    const SE3& T_ref_cur,
+    const Vector3d& f,
+    const double z,
+    const double px_error_angle)
 {
-  Vector3d t(T_ref_cur.translation());
-  Vector3d a = f*z-t;
-  double t_norm = t.norm();
-  double a_norm = a.norm();
-  double alpha = acos(f.dot(t)/t_norm); // dot product
-  double beta = acos(a.dot(-t)/(t_norm*a_norm)); // dot product
-  double beta_plus = beta + px_error_angle;
-  double gamma_plus = PI-alpha-beta_plus; // triangle angles sum to PI
-  double z_plus = t_norm*sin(beta_plus)/sin(gamma_plus); // law of sines
-  return (z_plus - z); // tau
+    Vector3d t(T_ref_cur.translation());
+    Vector3d a = f*z-t;
+    double t_norm = t.norm();
+    double a_norm = a.norm();
+    double alpha = acos(f.dot(t)/t_norm); // dot product
+    double beta = acos(a.dot(-t)/(t_norm*a_norm)); // dot product
+    double beta_plus = beta + px_error_angle;
+    double gamma_plus = PI-alpha-beta_plus; // triangle angles sum to PI
+    double z_plus = t_norm*sin(beta_plus)/sin(gamma_plus); // law of sines
+    return (z_plus - z); // tau
 }
 
 } // namespace svo
