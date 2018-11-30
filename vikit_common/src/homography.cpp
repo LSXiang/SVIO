@@ -233,92 +233,84 @@ bool operator<(const HomographyDecomposition lhs, const HomographyDecomposition 
     return lhs.score < rhs.score;
 }
 
-void Homography::findBestDecomposition()
-{
-    assert(decompositions.size() == 8); // a total of eight solutions of homography decomposition
-    
-    // references: Motion and structure from motion in a piecewise plannar environment  <see Proposition 4>
-    // 1st, the z-coordinates of the corner points in the KF1&2 should > 0
-    for(size_t i=0; i<decompositions.size(); i++)
-    {
-        HomographyDecomposition &decom = decompositions[i];
-        size_t nPositive = 0;
-        for(size_t m=0; m<fts_c1.size(); m++)
-        {
-            if(!inliers[m])
-                continue;
-            const Vector2d& v2 = fts_c1[m];
-            // set X2=[x2, y2, z2]^T in KF2, X1=[x1, y1, z1]^T in KF1, (alpha)X2 = AX1, and alpha = d then
-            //      | x2 |   | a00 a01 a02 || x1 |         | m2 |     | a00 a01 a02 || m1 | 
-            // alpha| y2 | = | a10 a11 a12 || y1 |  => d*z2| n2 | = z1| a10 a11 a12 || n1 | (where m=x/z, n=y/z)
-            //      | z2 |   | a20 a21 a22 || z1 |         |  1 |     | a20 a21 a22 ||  1 |
-            // so, d*z2 = z1*(a20*m1 + a21*n1 + a22)
-            // therefore, z2/z1 = (a20*m1 + a21*n1 + a22)/d
-            double dVisibilityTest = (H_c2_from_c1(2,0) * v2[0] + H_c2_from_c1(2,1) * v2[1] + H_c2_from_c1(2,2)) / decom.d;
-            if(dVisibilityTest > 0.0)
-                nPositive++;
-        }
-        decom.score = -nPositive;
+void Homography::findBestDecomposition() {
+  assert(decompositions.size() == 8); // a total of eight solutions of homography decomposition
+  
+  // references: Motion and structure from motion in a piecewise plannar environment  <see Proposition 4>
+  // 1st, the z-coordinates of the corner points in the KF1&2 should > 0
+  for (size_t i=0; i<decompositions.size(); i++) {
+    HomographyDecomposition &decom = decompositions[i];
+    size_t nPositive = 0;
+    for (size_t m=0; m<fts_c1.size(); m++) {
+      if (!inliers[m])
+        continue;
+      const Vector2d& v2 = fts_c1[m];
+      // set X2=[x2, y2, z2]^T in KF2, X1=[x1, y1, z1]^T in KF1, (alpha)X2 = AX1, and alpha = d then
+      //      | x2 |   | a00 a01 a02 || x1 |         | m2 |     | a00 a01 a02 || m1 | 
+      // alpha| y2 | = | a10 a11 a12 || y1 |  => d*z2| n2 | = z1| a10 a11 a12 || n1 | (where m=x/z, n=y/z)
+      //      | z2 |   | a20 a21 a22 || z1 |         |  1 |     | a20 a21 a22 ||  1 |
+      // so, d*z2 = z1*(a20*m1 + a21*n1 + a22)
+      // therefore, z2/z1 = (a20*m1 + a21*n1 + a22)/d
+      double dVisibilityTest = (H_c2_from_c1(2,0) * v2[0] + H_c2_from_c1(2,1) * v2[1] + H_c2_from_c1(2,2)) / decom.d;
+      if(dVisibilityTest > 0.0)
+        nPositive++;
+    }
+    decom.score = -nPositive;
+  }
+
+  sort(decompositions.begin(), decompositions.end());   // sorts the elements in the range in ascending order. elements are compared using operator<
+  decompositions.resize(4);                             // remove 4 elements with a relatively low score
+
+  // 2nd, the z-coordinates of the corner points in the KF1 should > 0
+  for (size_t i=0; i<decompositions.size(); i++) {
+    HomographyDecomposition &decom = decompositions[i];
+    int nPositive = 0;
+    for (size_t m=0; m<fts_c1.size(); m++) {
+      if(!inliers[m])
+        continue;
+      Vector3d v3 = unproject2d(fts_c1[m]);
+      // (n^t)X1 = d, since z1 > 0
+      //               | x1 |                           | m1 |
+      // | nx, ny, nz || y1 | = d,   => z1| nx, ny, nz || n1 | = d,  => z1 = d/(nx*m1 + ny*n1 + nz) > 0
+      //               | z1 |                           |  1 |
+      double dVisibilityTest = v3.dot(decom.n) / decom.d; //!< 1/z1
+      if(dVisibilityTest > 0.0)
+        nPositive++;
+    }
+    decom.score = -nPositive;
+  }
+
+  // leaves only two solutions among the four
+  sort(decompositions.begin(), decompositions.end());
+  decompositions.resize(2);
+
+  // According to Faugeras and Lustman, ambiguity exists if the two scores are equal
+  // but in practive, better to look at the ratio!
+  double dRatio = (double) decompositions[1].score / (double) decompositions[0].score;
+
+  if (dRatio < 0.9) { // no ambiguity!
+    decompositions.erase(decompositions.begin() + 1);
+  } else {  // two-way ambiguity. Resolve by sampsonus score of all points.
+    double dErrorSquaredLimit  = thresh * thresh * 4;
+    double adSampsonusScores[2];
+    for (size_t i=0; i<2; i++) {
+      Sophus::SE3 T = decompositions[i].T;
+      Matrix3d Essential = T.rotation_matrix() * sqew(T.translation());
+      double dSumError = 0;
+      for (size_t m=0; m < fts_c1.size(); m++ ) {
+        double d = sampsonusError(fts_c1[m], Essential, fts_c2[m]);
+        if(d > dErrorSquaredLimit)
+          d = dErrorSquaredLimit;
+        dSumError += d;
+      }
+      adSampsonusScores[i] = dSumError;
     }
 
-    sort(decompositions.begin(), decompositions.end());   // sorts the elements in the range in ascending order. elements are compared using operator<
-    decompositions.resize(4);                             // remove 4 elements with a relatively low score
-
-    // 2nd, the z-coordinates of the corner points in the KF1 should > 0
-    for(size_t i=0; i<decompositions.size(); i++)
-    {
-        HomographyDecomposition &decom = decompositions[i];
-        int nPositive = 0;
-        for(size_t m=0; m<fts_c1.size(); m++)
-        {
-            if(!inliers[m])
-                continue;
-            Vector3d v3 = unproject2d(fts_c1[m]);
-            // (n^t)X1 = d, since z1 > 0
-            //               | x1 |                           | m1 |
-            // | nx, ny, nz || y1 | = d,   => z1| nx, ny, nz || n1 | = d,  => z1 = d/(nx*m1 + ny*n1 + nz) > 0
-            //               | z1 |                           |  1 |
-            double dVisibilityTest = v3.dot(decom.n) / decom.d; //!< 1/z1
-            if(dVisibilityTest > 0.0)
-                nPositive++;
-        };
-        decom.score = -nPositive;
-    }
-
-    // leaves only two solutions among the four
-    sort(decompositions.begin(), decompositions.end());
-    decompositions.resize(2);
-
-    // According to Faugeras and Lustman, ambiguity exists if the two scores are equal
-    // but in practive, better to look at the ratio!
-    double dRatio = (double) decompositions[1].score / (double) decompositions[0].score;
-
-    if(dRatio < 0.9) // no ambiguity!
-        decompositions.erase(decompositions.begin() + 1);
-    else  // two-way ambiguity. Resolve by sampsonus score of all points.
-    {
-        double dErrorSquaredLimit  = thresh * thresh * 4;
-        double adSampsonusScores[2];
-        for(size_t i=0; i<2; i++)
-        {
-            Sophus::SE3 T = decompositions[i].T;
-            Matrix3d Essential = T.rotation_matrix() * sqew(T.translation());
-            double dSumError = 0;
-            for(size_t m=0; m < fts_c1.size(); m++ )
-            {
-                double d = sampsonusError(fts_c1[m], Essential, fts_c2[m]);
-                if(d > dErrorSquaredLimit)
-                    d = dErrorSquaredLimit;
-                dSumError += d;
-            }
-            adSampsonusScores[i] = dSumError;
-        }
-
-        if(adSampsonusScores[0] <= adSampsonusScores[1])
-            decompositions.erase(decompositions.begin() + 1);
-        else
-            decompositions.erase(decompositions.begin());
-    }
+    if(adSampsonusScores[0] <= adSampsonusScores[1])
+      decompositions.erase(decompositions.begin() + 1);
+    else
+      decompositions.erase(decompositions.begin());
+  }
 }
 
 
