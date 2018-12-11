@@ -121,7 +121,7 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
 
     // two-frame bundle adjustment
 #ifdef USE_BUNDLE_ADJUSTMENT
-    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);    // lobaThresh default:2.0f
+    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);  // lobaThresh default:2.0f
 #endif
 
     map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
@@ -140,33 +140,33 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processFrame()
 {
-  // Set initial pose TODO use prior
-  new_frame_->T_f_w_ = last_frame_->T_f_w_;
+    // Set initial pose TODO use prior
+    new_frame_->T_f_w_ = last_frame_->T_f_w_;
 
-  // sparse image align
-  SVO_START_TIMER("sparse_img_align");
-  SparseImgAlign img_align(Config::kltMaxLevel(), Config::kltMinLevel(),
-                           30, SparseImgAlign::GaussNewton, false, false);
-  size_t img_align_n_tracked = img_align.run(last_frame_, new_frame_);
-  SVO_STOP_TIMER("sparse_img_align");
-  SVO_LOG(img_align_n_tracked);
-  SVO_DEBUG_STREAM("Img Align:\t Tracked = " << img_align_n_tracked);
+    // sparse image align
+    SVO_START_TIMER("sparse_img_align");
+    SparseImgAlign img_align(Config::kltMaxLevel(), Config::kltMinLevel(),  // max & min default: 4, 2
+                             30, SparseImgAlign::GaussNewton, false, false);
+    size_t img_align_n_tracked = img_align.run(last_frame_, new_frame_);
+    SVO_STOP_TIMER("sparse_img_align");
+    SVO_LOG(img_align_n_tracked);
+    SVO_DEBUG_STREAM("Img Align:\t Tracked = " << img_align_n_tracked);
 
-  // map reprojection & feature alignment
-  SVO_START_TIMER("reproject");
-  reprojector_.reprojectMap(new_frame_, overlap_kfs_);
-  SVO_STOP_TIMER("reproject");
-  const size_t repr_n_new_references = reprojector_.n_matches_;
-  const size_t repr_n_mps = reprojector_.n_trials_;
-  SVO_LOG2(repr_n_mps, repr_n_new_references);
-  SVO_DEBUG_STREAM("Reprojection:\t nPoints = "<<repr_n_mps<<"\t \t nMatches = "<<repr_n_new_references);
-  if(repr_n_new_references < Config::qualityMinFts())
-  {
-    SVO_WARN_STREAM_THROTTLE(1.0, "Not enough matched features.");
-    new_frame_->T_f_w_ = last_frame_->T_f_w_; // reset to avoid crazy pose jumps
-    tracking_quality_ = TRACKING_INSUFFICIENT;
-    return RESULT_FAILURE;
-  }
+    // map reprojection & feature alignment
+    SVO_START_TIMER("reproject");
+    reprojector_.reprojectMap(new_frame_, overlap_kfs_);
+    SVO_STOP_TIMER("reproject");
+    const size_t repr_n_new_references = reprojector_.n_matches_;
+    const size_t repr_n_mps = reprojector_.n_trials_;
+    SVO_LOG2(repr_n_mps, repr_n_new_references);
+    SVO_DEBUG_STREAM("Reprojection:\t nPoints = "<<repr_n_mps<<"\t \t nMatches = "<<repr_n_new_references);
+    if(repr_n_new_references < Config::qualityMinFts()) 
+    {
+        SVO_WARN_STREAM_THROTTLE(1.0, "Not enough matched features.");
+        new_frame_->T_f_w_ = last_frame_->T_f_w_; // reset to avoid crazy pose jumps
+        tracking_quality_ = TRACKING_INSUFFICIENT;
+        return RESULT_FAILURE;
+    }
 
   // pose optimization
   SVO_START_TIMER("pose_optimizer");

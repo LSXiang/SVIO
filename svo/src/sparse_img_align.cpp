@@ -26,13 +26,11 @@
 
 namespace svo {
 
-SparseImgAlign::SparseImgAlign(
-    int max_level, int min_level, int n_iter,
-    Method method, bool display, bool verbose) :
-        display_(display),
-        max_level_(max_level),
-        min_level_(min_level)
-{
+SparseImgAlign::SparseImgAlign(int max_level, int min_level, int n_iter,
+                               Method method, bool display, bool verbose)
+    : display_(display),
+      max_level_(max_level),
+      min_level_(min_level) {
   n_iter_ = n_iter;
   n_iter_init_ = n_iter_;
   method_ = method;
@@ -40,36 +38,31 @@ SparseImgAlign::SparseImgAlign(
   eps_ = 0.000001;
 }
 
-size_t SparseImgAlign::run(FramePtr ref_frame, FramePtr cur_frame)
-{
-  reset();
+size_t SparseImgAlign::run(FramePtr ref_frame, FramePtr cur_frame) {
+  reset();    //!< Reset all parameters to restart the optimization
 
-  if(ref_frame->fts_.empty())
-  {
+  if (ref_frame->fts_.empty()) {
     SVO_WARN_STREAM("SparseImgAlign: no features to track!");
     return 0;
   }
 
   ref_frame_ = ref_frame;
   cur_frame_ = cur_frame;
-  ref_patch_cache_ = cv::Mat(ref_frame_->fts_.size(), patch_area_, CV_32F);       // create n x 16 matrix
-  jacobian_cache_.resize(Eigen::NoChange, ref_patch_cache_.rows*patch_area_);     // create 6 x 16*n matrix
+  ref_patch_cache_ = cv::Mat(ref_frame_->fts_.size(), patch_area_, CV_32F);   // create n x 16 matrix
+  jacobian_cache_.resize(Eigen::NoChange, ref_patch_cache_.rows*patch_area_); // create 6 x n*16 matrix
   visible_fts_.resize(ref_patch_cache_.rows, false); // TODO: should it be reset at each level?
 
   SE3 T_cur_from_ref(cur_frame_->T_f_w_ * ref_frame_->T_f_w_.inverse());
 
-  for(level_=max_level_; level_>=min_level_; --level_)
-  {
+  for (level_=max_level_; level_>=min_level_; --level_) {
     mu_ = 0.1;
     jacobian_cache_.setZero();
     have_ref_patch_cache_ = false;
-    if(verbose_)
+    if (verbose_)
       printf("\nPYRAMID LEVEL %i\n---------------\n", level_);
     optimize(T_cur_from_ref);
   }
   cur_frame_->T_f_w_ = T_cur_from_ref * ref_frame_->T_f_w_;
-
-
 
   return n_meas_/patch_area_;
 }
@@ -81,8 +74,7 @@ Matrix<double, 6, 6> SparseImgAlign::getFisherInformation()
   return I;
 }
 
-void SparseImgAlign::precomputeReferencePatches()
-{
+void SparseImgAlign::precomputeReferencePatches() {
   const int border = patch_halfsize_+1;
   const cv::Mat& ref_img = ref_frame_->img_pyr_.at(level_);
   const int stride = ref_img.cols;
@@ -91,9 +83,8 @@ void SparseImgAlign::precomputeReferencePatches()
   const double focal_length = ref_frame_->cam_->errorMultiplier2();
   size_t feature_counter = 0;
   std::vector<bool>::iterator visiblity_it = visible_fts_.begin();
-  for(auto it=ref_frame_->fts_.begin(), ite=ref_frame_->fts_.end();
-      it!=ite; ++it, ++feature_counter, ++visiblity_it)
-  {
+  for (auto it=ref_frame_->fts_.begin(), ite=ref_frame_->fts_.end();
+      it!=ite; ++it, ++feature_counter, ++visiblity_it) {
     // check if reference with patch size is within image
     const float u_ref = (*it)->px[0]*scale;
     const float v_ref = (*it)->px[1]*scale;
@@ -120,11 +111,9 @@ void SparseImgAlign::precomputeReferencePatches()
     const float w_ref_br = subpix_u_ref * subpix_v_ref;
     size_t pixel_counter = 0;
     float* cache_ptr = reinterpret_cast<float*>(ref_patch_cache_.data) + patch_area_*feature_counter;
-    for(int y=0; y<patch_size_; ++y)
-    {
+    for (int y=0; y<patch_size_; ++y) {
       uint8_t* ref_img_ptr = (uint8_t*) ref_img.data + (v_ref_i+y-patch_halfsize_)*stride + (u_ref_i-patch_halfsize_);
-      for(int x=0; x<patch_size_; ++x, ++ref_img_ptr, ++cache_ptr, ++pixel_counter)
-      {
+      for (int x=0; x<patch_size_; ++x, ++ref_img_ptr, ++cache_ptr, ++pixel_counter) {
         // precompute interpolated reference patch color
         *cache_ptr = w_ref_tl*ref_img_ptr[0] + w_ref_tr*ref_img_ptr[1] + w_ref_bl*ref_img_ptr[stride] + w_ref_br*ref_img_ptr[stride+1];
 
@@ -173,7 +162,7 @@ double SparseImgAlign::computeResiduals(
       ++it, ++feature_counter, ++visiblity_it)
   {
     // check if feature is within image
-    if(!*visiblity_it)
+    if (!*visiblity_it)
       continue;
 
     // compute pixel location in cur img
@@ -199,31 +188,28 @@ double SparseImgAlign::computeResiduals(
     const float w_cur_br = subpix_u_cur * subpix_v_cur;
     float* ref_patch_cache_ptr = reinterpret_cast<float*>(ref_patch_cache_.data) + patch_area_*feature_counter;
     size_t pixel_counter = 0; // is used to compute the index of the cached jacobian
-    for(int y=0; y<patch_size_; ++y)
-    {
+    for(int y=0; y<patch_size_; ++y) {
       uint8_t* cur_img_ptr = (uint8_t*) cur_img.data + (v_cur_i+y-patch_halfsize_)*stride + (u_cur_i-patch_halfsize_);
 
-      for(int x=0; x<patch_size_; ++x, ++pixel_counter, ++cur_img_ptr, ++ref_patch_cache_ptr)
-      {
+      for(int x=0; x<patch_size_; ++x, ++pixel_counter, ++cur_img_ptr, ++ref_patch_cache_ptr) {
         // compute residual
         const float intensity_cur = w_cur_tl*cur_img_ptr[0] + w_cur_tr*cur_img_ptr[1] + w_cur_bl*cur_img_ptr[stride] + w_cur_br*cur_img_ptr[stride+1];
         const float res = intensity_cur - (*ref_patch_cache_ptr);
 
         // used to compute scale for robust cost
-        if(compute_weight_scale)
+        if (compute_weight_scale)
           errors.push_back(fabsf(res));
 
         // robustification
         float weight = 1.0;
-        if(use_weights_) {
+        if (use_weights_) {
           weight = weight_function_->value(res/scale_);
         }
 
         chi2 += res*res*weight;
         n_meas_++;
 
-        if(linearize_system)
-        {
+        if (linearize_system) {
           // compute Jacobian, weighted Hessian and weighted "steepest descend images" (times error)
           const Vector6d J(jacobian_cache_.col(feature_counter*patch_area_ + pixel_counter));
           H_.noalias() += J*J.transpose()*weight;

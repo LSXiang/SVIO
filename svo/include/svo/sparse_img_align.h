@@ -30,12 +30,11 @@ namespace svo {
 class Feature;
 
 /// Optimize the pose of the frame by minimizing the photometric error of feature patches.
-class SparseImgAlign : public vk::NLLSSolver<6, SE3>
-{
+class SparseImgAlign : public vk::NLLSSolver<6, SE3> {
   static const int patch_halfsize_ = 2;
   static const int patch_size_ = 2*patch_halfsize_;
   static const int patch_area_ = patch_size_*patch_size_;
-public:
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   cv::Mat resimg_;
@@ -56,7 +55,7 @@ public:
   /// at the converged state.
   Matrix<double, 6, 6> getFisherInformation();
 
-protected:
+ protected:
   FramePtr ref_frame_;            //!< reference frame, has depth for gradient pixels.
   FramePtr cur_frame_;            //!< only the image is known!
   int level_;                     //!< current pyramid level on which the optimization runs.

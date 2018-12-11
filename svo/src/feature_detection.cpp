@@ -26,101 +26,93 @@ AbstractDetector::AbstractDetector(
     const int img_width,
     const int img_height,
     const int cell_size,
-    const int n_pyr_levels) :
-        cell_size_(cell_size),
-        n_pyr_levels_(n_pyr_levels),
-        grid_n_cols_(ceil(static_cast<double>(img_width)/cell_size_)),
-        grid_n_rows_(ceil(static_cast<double>(img_height)/cell_size_)),
-        grid_occupancy_(grid_n_cols_*grid_n_rows_, false)
-{}
+    const int n_pyr_levels)
+        : cell_size_(cell_size),
+          n_pyr_levels_(n_pyr_levels),
+          grid_n_cols_(ceil(static_cast<double>(img_width)/cell_size_)),
+          grid_n_rows_(ceil(static_cast<double>(img_height)/cell_size_)),
+          grid_occupancy_(grid_n_cols_*grid_n_rows_, false) {}
 
-void AbstractDetector::resetGrid()
-{
-    std::fill(grid_occupancy_.begin(), grid_occupancy_.end(), false);
+void AbstractDetector::resetGrid() {
+  std::fill(grid_occupancy_.begin(), grid_occupancy_.end(), false);
 }
 
-void AbstractDetector::setExistingFeatures(const Features& fts)
-{
-    //!< set a flag for which grid the feature points locate in
-    std::for_each(fts.begin(), fts.end(), [&](Feature* i){
+void AbstractDetector::setExistingFeatures(const Features& fts) {
+  //!< set a flag for which grid the feature points locate in
+  std::for_each(fts.begin(), fts.end(), [&](Feature* i) {
     grid_occupancy_.at(
         static_cast<int>(i->px[1]/cell_size_)*grid_n_cols_
         + static_cast<int>(i->px[0]/cell_size_)) = true;
-    });
+  });
 }
 
-void AbstractDetector::setGridOccpuancy(const Vector2d& px)
-{
-    grid_occupancy_.at(
-        static_cast<int>(px[1]/cell_size_)*grid_n_cols_
-        + static_cast<int>(px[0]/cell_size_)) = true;
+void AbstractDetector::setGridOccpuancy(const Vector2d& px) {
+  grid_occupancy_.at(
+      static_cast<int>(px[1]/cell_size_)*grid_n_cols_
+      + static_cast<int>(px[0]/cell_size_)) = true;
 }
 
 FastDetector::FastDetector(
     const int img_width,
     const int img_height,
     const int cell_size,
-    const int n_pyr_levels) :
-        AbstractDetector(img_width, img_height, cell_size, n_pyr_levels)
-{}
+    const int n_pyr_levels)
+        : AbstractDetector(img_width, img_height, cell_size, n_pyr_levels) {}
 
 void FastDetector::detect(
     Frame* frame,
     const ImgPyr& img_pyr,
     const double detection_threshold,
-    Features& fts)
-{
-    Corners corners(grid_n_cols_*grid_n_rows_, Corner(0,0,detection_threshold,0,0.0f));
-    for (int L=0; L<n_pyr_levels_; ++L)
-    {
-        const int scale = (1<<L);
-        vector<fast::fast_xy> fast_corners;
-        
-        // detect fast_10 feature corner with barrier(20) in current level image
+    Features& fts) {
+  Corners corners(grid_n_cols_*grid_n_rows_, Corner(0,0,detection_threshold,0,0.0f));
+  for (int L=0; L<n_pyr_levels_; ++L) {
+    const int scale = (1<<L);
+    vector<fast::fast_xy> fast_corners;
+    
+    // detect fast_10 feature corner with barrier(20) in current level image
 #if __SSE2__
-        fast::fast_corner_detect_10_sse2(
-            (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-            img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
+    fast::fast_corner_detect_10_sse2(
+        (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
+        img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
 #elif HAVE_FAST_NEON
-        fast::fast_corner_detect_9_neon(
-            (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-            img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
+    fast::fast_corner_detect_9_neon(
+        (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
+        img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
 #else
-        fast::fast_corner_detect_10(
-            (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-            img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
+    fast::fast_corner_detect_10(
+        (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
+        img_pyr[L].rows, img_pyr[L].cols, 20, fast_corners);
 #endif
-        vector<int> scores, nm_corners;
-        // compute score of the detected fast_10 feature corner
-        fast::fast_corner_score_10((fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols, fast_corners, 20, scores);
-        // select local maximum on a 3x3 window by nonmax suppression
-        fast::fast_nonmax_3x3(fast_corners, scores, nm_corners);
+    vector<int> scores, nm_corners;
+    // compute score of the detected fast_10 feature corner
+    fast::fast_corner_score_10((fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols, fast_corners, 20, scores);
+    // select local maximum on a 3x3 window by nonmax suppression
+    fast::fast_nonmax_3x3(fast_corners, scores, nm_corners);
 
-        for(auto it=nm_corners.begin(), ite=nm_corners.end(); it!=ite; ++it)
-        {
-            // compute the corner locate in which grid
-            fast::fast_xy& xy = fast_corners.at(*it);
-            const int k = static_cast<int>((xy.y*scale)/cell_size_)*grid_n_cols_
-                        + static_cast<int>((xy.x*scale)/cell_size_);
-            
-            // If the grid already was occupied, continue (Or, if the grid already has corners, continue)
-            if (grid_occupancy_[k])
-                continue;
-            
-            // compute the shiTomasiScore for corner, which is located in the same grid and only stores the maximum score.
-            const float score = vk::shiTomasiScore(img_pyr[L], xy.x, xy.y);
-            if(score > corners.at(k).score)
-                corners.at(k) = Corner(xy.x*scale, xy.y*scale, score, L, 0.0f);
-        }
+    for (auto it=nm_corners.begin(), ite=nm_corners.end(); it!=ite; ++it) {
+      // compute the corner locate in which grid
+      fast::fast_xy& xy = fast_corners.at(*it);
+      const int k = static_cast<int>((xy.y*scale)/cell_size_)*grid_n_cols_
+                  + static_cast<int>((xy.x*scale)/cell_size_);
+      
+      // If the grid already was occupied, continue (Or, if the grid already has corners, continue)
+      if (grid_occupancy_[k])
+        continue;
+      
+      // compute the shiTomasiScore for corner, which is located in the same grid and only stores the maximum score.
+      const float score = vk::shiTomasiScore(img_pyr[L], xy.x, xy.y);
+      if (score > corners.at(k).score)
+        corners.at(k) = Corner(xy.x*scale, xy.y*scale, score, L, 0.0f);
     }
+  }
 
-    // Create feature for every corner that has high enough corner score
-    std::for_each(corners.begin(), corners.end(), [&](Corner& c) {
-        if(c.score > detection_threshold)
-        fts.push_back(new Feature(frame, Vector2d(c.x, c.y), c.level));
-    });
+  // Create feature for every corner that has high enough corner score
+  std::for_each(corners.begin(), corners.end(), [&](Corner& c) {
+    if(c.score > detection_threshold)
+    fts.push_back(new Feature(frame, Vector2d(c.x, c.y), c.level));
+  });
 
-    resetGrid();
+  resetGrid();
 }
 
 } // namespace feature_detection

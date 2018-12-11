@@ -67,45 +67,39 @@ void halfSampleNEON( const cv::Mat& in, cv::Mat& out )
 #endif
 
 
-void
-halfSample(const cv::Mat& in, cv::Mat& out)
-{
-    assert( in.rows/2==out.rows && in.cols/2==out.cols);
-    assert( in.type()==CV_8U && out.type()==CV_8U);
+void halfSample(const cv::Mat& in, cv::Mat& out) {
+  assert( in.rows/2==out.rows && in.cols/2==out.cols);
+  assert( in.type()==CV_8U && out.type()==CV_8U);
 
 #ifdef __SSE2__
-    if (aligned_mem::is_aligned16(in.data) && aligned_mem::is_aligned16(out.data) && ((in.cols % 16) == 0))
-    {
-        halfSampleSSE2(in.data, out.data, in.cols, in.rows);
-        return;
-    }
+  if (aligned_mem::is_aligned16(in.data) && aligned_mem::is_aligned16(out.data) && ((in.cols % 16) == 0)) {
+    halfSampleSSE2(in.data, out.data, in.cols, in.rows);
+    return;
+  }
 #endif 
 #ifdef __ARM_NEON__ 
-    if ( (in.cols % 16) == 0 )
-    {
-        halfSampleNEON(in, out);
-        return;
-    }
+  if ( (in.cols % 16) == 0 ) {
+    halfSampleNEON(in, out);
+    return;
+  }
 #endif
 
-    const int stride = in.step.p[0];
-    uint8_t* top = (uint8_t*) in.data;
-    uint8_t* bottom = top + stride;
-    uint8_t* end = top + stride*in.rows;
-    const int out_width = out.cols;
-    uint8_t* p = (uint8_t*) out.data;
-    while (bottom < end)
-    {
-        for (int j=0; j<out_width; j++) 
-        {
-            *p = static_cast<uint8_t>( (uint16_t (top[0]) + top[1] + bottom[0] + bottom[1])/4 );
-            p++;
-            top += 2;
-            bottom += 2;
-        }
-        top += stride;
-        bottom += stride;
+  const int stride = in.step.p[0];
+  uint8_t* top = (uint8_t*) in.data;
+  uint8_t* bottom = top + stride;
+  uint8_t* end = top + stride*in.rows;
+  const int out_width = out.cols;
+  uint8_t* p = (uint8_t*) out.data;
+  while (bottom < end) {
+    for (int j=0; j<out_width; j++) {
+      *p = static_cast<uint8_t>( (uint16_t (top[0]) + top[1] + bottom[0] + bottom[1])/4 );
+      p++;
+      top += 2;
+      bottom += 2;
     }
+    top += stride;
+    bottom += stride;
+  }
 }
 
 // refer to https://blog.csdn.net/hzwwpgmwy/article/details/81482278
@@ -122,53 +116,47 @@ halfSample(const cv::Mat& in, cv::Mat& out)
 // 
 // compute min(lambda)
 //
-float shiTomasiScore(const cv::Mat& img, int u, int v)
-{
-    assert(img.type() == CV_8UC1);
+float shiTomasiScore(const cv::Mat& img, int u, int v) {
+  assert(img.type() == CV_8UC1);
 
-    float dXX = 0.0;
-    float dYY = 0.0;
-    float dXY = 0.0;
-    const int halfbox_size = 4;
-    const int box_size = 2*halfbox_size;
-    const int box_area = box_size*box_size;
-    const int x_min = u-halfbox_size;
-    const int x_max = u+halfbox_size;
-    const int y_min = v-halfbox_size;
-    const int y_max = v+halfbox_size;
+  float dXX = 0.0;
+  float dYY = 0.0;
+  float dXY = 0.0;
+  const int halfbox_size = 4;
+  const int box_size = 2*halfbox_size;
+  const int box_area = box_size*box_size;
+  const int x_min = u-halfbox_size;
+  const int x_max = u+halfbox_size;
+  const int y_min = v-halfbox_size;
+  const int y_max = v+halfbox_size;
 
-    if(x_min < 1 || x_max >= img.cols-1 || y_min < 1 || y_max >= img.rows-1)
-        return 0.0; // patch is too close to the boundary
+  if(x_min < 1 || x_max >= img.cols-1 || y_min < 1 || y_max >= img.rows-1)
+    return 0.0; // patch is too close to the boundary
 
-    const int stride = img.step.p[0];
-    for( int y=y_min; y<y_max; ++y )
-    {
-        const uint8_t* ptr_left   = img.data + stride*y + x_min - 1;
-        const uint8_t* ptr_right  = img.data + stride*y + x_min + 1;
-        const uint8_t* ptr_top    = img.data + stride*(y-1) + x_min;
-        const uint8_t* ptr_bottom = img.data + stride*(y+1) + x_min;
-        for(int x = 0; x < box_size; ++x, ++ptr_left, ++ptr_right, ++ptr_top, ++ptr_bottom)
-        {
-            float dx = *ptr_right - *ptr_left;
-            float dy = *ptr_bottom - *ptr_top;
-            dXX += dx*dx;
-            dYY += dy*dy;
-            dXY += dx*dy;
-        }
+  const int stride = img.step.p[0];
+  for ( int y=y_min; y<y_max; ++y ) {
+    const uint8_t* ptr_left   = img.data + stride*y + x_min - 1;
+    const uint8_t* ptr_right  = img.data + stride*y + x_min + 1;
+    const uint8_t* ptr_top    = img.data + stride*(y-1) + x_min;
+    const uint8_t* ptr_bottom = img.data + stride*(y+1) + x_min;
+    for (int x = 0; x < box_size; ++x, ++ptr_left, ++ptr_right, ++ptr_top, ++ptr_bottom) {
+      float dx = *ptr_right - *ptr_left;
+      float dy = *ptr_bottom - *ptr_top;
+      dXX += dx*dx;
+      dYY += dy*dy;
+      dXY += dx*dy;
     }
+  }
 
-    // Find and return smaller eigenvalue:
-    dXX = dXX / (2.0 * box_area);
-    dYY = dYY / (2.0 * box_area);
-    dXY = dXY / (2.0 * box_area);
-    return 0.5 * (dXX + dYY - sqrt( (dXX + dYY) * (dXX + dYY) - 4 * (dXX * dYY - dXY * dXY) ));
+  // Find and return smaller eigenvalue:
+  dXX = dXX / (2.0 * box_area);
+  dYY = dYY / (2.0 * box_area);
+  dXY = dXY / (2.0 * box_area);
+  return 0.5 * (dXX + dYY - sqrt( (dXX + dYY) * (dXX + dYY) - 4 * (dXX * dYY - dXY * dXY) ));
 }
 
 
-void
-calcSharrDeriv(const cv::Mat& src, cv::Mat& dst)
-{
-
+void calcSharrDeriv(const cv::Mat& src, cv::Mat& dst) {
   using namespace cv;
   typedef short deriv_type;
 
@@ -184,69 +172,63 @@ calcSharrDeriv(const cv::Mat& src, cv::Mat& dst)
   __m128i z = _mm_setzero_si128(), c3 = _mm_set1_epi16(3), c10 = _mm_set1_epi16(10);
 #endif
 
-  for( y = 0; y < rows; y++ )
-  {
-      const uchar* srow0 = src.ptr<uchar>(y > 0 ? y-1 : rows > 1 ? 1 : 0);
-      const uchar* srow1 = src.ptr<uchar>(y);
-      const uchar* srow2 = src.ptr<uchar>(y < rows-1 ? y+1 : rows > 1 ? rows-2 : 0);
-      deriv_type* drow = dst.ptr<deriv_type>(y);
+  for (y = 0; y < rows; y++) {
+    const uchar* srow0 = src.ptr<uchar>(y > 0 ? y-1 : rows > 1 ? 1 : 0);
+    const uchar* srow1 = src.ptr<uchar>(y);
+    const uchar* srow2 = src.ptr<uchar>(y < rows-1 ? y+1 : rows > 1 ? rows-2 : 0);
+    deriv_type* drow = dst.ptr<deriv_type>(y);
 
-      // do vertical convolution
-      x = 0;
+    // do vertical convolution
+    x = 0;
 #ifdef __SSE2__
-      for( ; x <= colsn - 8; x += 8 )
-      {
-          __m128i s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow0 + x)), z);
-          __m128i s1 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow1 + x)), z);
-          __m128i s2 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow2 + x)), z);
-          __m128i t0 = _mm_add_epi16(_mm_mullo_epi16(_mm_add_epi16(s0, s2), c3), _mm_mullo_epi16(s1, c10));
-          __m128i t1 = _mm_sub_epi16(s2, s0);
-          _mm_store_si128((__m128i*)(trow0 + x), t0);
-          _mm_store_si128((__m128i*)(trow1 + x), t1);
-      }
+    for ( ; x <= colsn - 8; x += 8) {
+      __m128i s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow0 + x)), z);
+      __m128i s1 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow1 + x)), z);
+      __m128i s2 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)(srow2 + x)), z);
+      __m128i t0 = _mm_add_epi16(_mm_mullo_epi16(_mm_add_epi16(s0, s2), c3), _mm_mullo_epi16(s1, c10));
+      __m128i t1 = _mm_sub_epi16(s2, s0);
+      _mm_store_si128((__m128i*)(trow0 + x), t0);
+      _mm_store_si128((__m128i*)(trow1 + x), t1);
+    }
 #endif
-      for( ; x < colsn; x++ )
-      {
-          int t0 = (srow0[x] + srow2[x])*3 + srow1[x]*10;
-          int t1 = srow2[x] - srow0[x];
-          trow0[x] = (deriv_type)t0;
-          trow1[x] = (deriv_type)t1;
-      }
+    for ( ; x < colsn; x++ ) {
+      int t0 = (srow0[x] + srow2[x])*3 + srow1[x]*10;
+      int t1 = srow2[x] - srow0[x];
+      trow0[x] = (deriv_type)t0;
+      trow1[x] = (deriv_type)t1;
+    }
 
-      // make border
-      int x0 = (cols > 1 ? 1 : 0)*cn, x1 = (cols > 1 ? cols-2 : 0)*cn;
-      for( int k = 0; k < cn; k++ )
-      {
-          trow0[-cn + k] = trow0[x0 + k]; trow0[colsn + k] = trow0[x1 + k];
-          trow1[-cn + k] = trow1[x0 + k]; trow1[colsn + k] = trow1[x1 + k];
-      }
+    // make border
+    int x0 = (cols > 1 ? 1 : 0)*cn, x1 = (cols > 1 ? cols-2 : 0)*cn;
+    for (int k = 0; k < cn; k++) {
+      trow0[-cn + k] = trow0[x0 + k]; trow0[colsn + k] = trow0[x1 + k];
+      trow1[-cn + k] = trow1[x0 + k]; trow1[colsn + k] = trow1[x1 + k];
+    }
 
-      // do horizontal convolution, interleave the results and store them to dst
-      x = 0;
+    // do horizontal convolution, interleave the results and store them to dst
+    x = 0;
 #ifdef __SSE2__
-      for( ; x <= colsn - 8; x += 8 )
-      {
-          __m128i s0 = _mm_loadu_si128((const __m128i*)(trow0 + x - cn));
-          __m128i s1 = _mm_loadu_si128((const __m128i*)(trow0 + x + cn));
-          __m128i s2 = _mm_loadu_si128((const __m128i*)(trow1 + x - cn));
-          __m128i s3 = _mm_load_si128((const __m128i*)(trow1 + x));
-          __m128i s4 = _mm_loadu_si128((const __m128i*)(trow1 + x + cn));
+    for ( ; x <= colsn - 8; x += 8) {
+      __m128i s0 = _mm_loadu_si128((const __m128i*)(trow0 + x - cn));
+      __m128i s1 = _mm_loadu_si128((const __m128i*)(trow0 + x + cn));
+      __m128i s2 = _mm_loadu_si128((const __m128i*)(trow1 + x - cn));
+      __m128i s3 = _mm_load_si128((const __m128i*)(trow1 + x));
+      __m128i s4 = _mm_loadu_si128((const __m128i*)(trow1 + x + cn));
 
-          __m128i t0 = _mm_sub_epi16(s1, s0);
-          __m128i t1 = _mm_add_epi16(_mm_mullo_epi16(_mm_add_epi16(s2, s4), c3), _mm_mullo_epi16(s3, c10));
-          __m128i t2 = _mm_unpacklo_epi16(t0, t1);
-          t0 = _mm_unpackhi_epi16(t0, t1);
-          // this can probably be replaced with aligned stores if we aligned dst properly.
-          _mm_storeu_si128((__m128i*)(drow + x*2), t2);
-          _mm_storeu_si128((__m128i*)(drow + x*2 + 8), t0);
-      }
+      __m128i t0 = _mm_sub_epi16(s1, s0);
+      __m128i t1 = _mm_add_epi16(_mm_mullo_epi16(_mm_add_epi16(s2, s4), c3), _mm_mullo_epi16(s3, c10));
+      __m128i t2 = _mm_unpacklo_epi16(t0, t1);
+      t0 = _mm_unpackhi_epi16(t0, t1);
+      // this can probably be replaced with aligned stores if we aligned dst properly.
+      _mm_storeu_si128((__m128i*)(drow + x*2), t2);
+      _mm_storeu_si128((__m128i*)(drow + x*2 + 8), t0);
+    }
 #endif
-      for( ; x < colsn; x++ )
-      {
-          deriv_type t0 = (deriv_type)(trow0[x+cn] - trow0[x-cn]);
-          deriv_type t1 = (deriv_type)((trow1[x+cn] + trow1[x-cn])*3 + trow1[x]*10);
-          drow[x*2] = t0; drow[x*2+1] = t1;
-      }
+    for ( ; x < colsn; x++) {
+        deriv_type t0 = (deriv_type)(trow0[x+cn] - trow0[x-cn]);
+        deriv_type t1 = (deriv_type)((trow1[x+cn] + trow1[x-cn])*3 + trow1[x]*10);
+        drow[x*2] = t0; drow[x*2+1] = t1;
+    }
   }
 
 //  vector<cv::Mat> vec_mat;

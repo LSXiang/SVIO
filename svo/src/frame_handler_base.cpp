@@ -109,37 +109,36 @@ int FrameHandlerBase::finishFrameProcessingCommon(
     const UpdateResult dropout,
     const size_t num_observations)
 {
-  SVO_DEBUG_STREAM("Frame: "<<update_id<<"\t fps-avg = "<< 1.0/acc_frame_timings_.getMean()<<"\t nObs = "<<acc_num_obs_.getMean());
-  SVO_LOG(dropout);
+    SVO_DEBUG_STREAM("Frame: "<<update_id<<"\t fps-avg = "<< 1.0/acc_frame_timings_.getMean()<<"\t nObs = "<<acc_num_obs_.getMean());
+    SVO_LOG(dropout);
 
-  // save processing time to calculate fps
-  acc_frame_timings_.push_back(timer_.stop());
-  if(stage_ == STAGE_DEFAULT_FRAME)
-    acc_num_obs_.push_back(num_observations);
-  num_obs_last_ = num_observations;
-  SVO_STOP_TIMER("tot_time");
+    // save processing time to calculate fps
+    acc_frame_timings_.push_back(timer_.stop());
+    if(stage_ == STAGE_DEFAULT_FRAME)
+        acc_num_obs_.push_back(num_observations);
+    num_obs_last_ = num_observations;
+    SVO_STOP_TIMER("tot_time");
 
 #ifdef SVO_TRACE
-  g_permon->writeToFile();
-  {
-    boost::unique_lock<boost::mutex> lock(map_.point_candidates_.mut_);
-    size_t n_candidates = map_.point_candidates_.candidates_.size();
-    SVO_LOG(n_candidates);
-  }
+    g_permon->writeToFile();
+    {
+        boost::unique_lock<boost::mutex> lock(map_.point_candidates_.mut_);
+        size_t n_candidates = map_.point_candidates_.candidates_.size();
+        SVO_LOG(n_candidates);
+    }
 #endif
 
-  if(dropout == RESULT_FAILURE &&
-      (stage_ == STAGE_DEFAULT_FRAME || stage_ == STAGE_RELOCALIZING ))
-  {
-    stage_ = STAGE_RELOCALIZING;
-    tracking_quality_ = TRACKING_INSUFFICIENT;
-  }
-  else if (dropout == RESULT_FAILURE)
-    resetAll();
-  if(set_reset_)
-    resetAll();
+    if(dropout == RESULT_FAILURE && (stage_ == STAGE_DEFAULT_FRAME || stage_ == STAGE_RELOCALIZING ))
+    {
+        stage_ = STAGE_RELOCALIZING;
+        tracking_quality_ = TRACKING_INSUFFICIENT;
+    }
+    else if (dropout == RESULT_FAILURE)
+        resetAll();
+    if(set_reset_)
+        resetAll();
 
-  return 0;
+    return 0;
 }
 
 void FrameHandlerBase::resetCommon()
