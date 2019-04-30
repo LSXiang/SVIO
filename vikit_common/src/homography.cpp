@@ -37,7 +37,7 @@ void Homography::calcFromMatches() {
     dst_pts[i] = cv::Point2f(fts_c2[i][0], fts_c2[i][1]);
   }
 
-  // TODO: replace this function to remove dependency from opencv! (Can try IPEE: https://github.com/tobycollins/IPPE)
+  // TODO: replace this function to remove dependency from opencv!
   //!< 1:input array source points  2:input array result points  3:0, cv::RANSAC, cv::LMEDS, etc. 4:max reprojection error 
   //!< in the case, the reprojection error of 2 pixels in the unit plane is 2./f_length
   cv::Mat cvH = cv::findHomography(src_pts, dst_pts, CV_RANSAC, 2./error_multiplier2);

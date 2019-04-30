@@ -34,12 +34,13 @@ InitResult KltHomographyInit::addFirstFrame(FramePtr frame_ref) {
     return FAILURE;
   }
   frame_ref_ = frame_ref;
+  px_pre_ = px_ref_;  
   px_cur_.insert(px_cur_.begin(), px_ref_.begin(), px_ref_.end());
   return SUCCESS;
 }
 
-InitResult KltHomographyInit::addSecondFrame(FramePtr frame_cur) {
-  trackKlt(frame_ref_, frame_cur, px_ref_, px_cur_, f_ref_, f_cur_, disparities_);
+InitResult KltHomographyInit::addSecondFrame(FramePtr frame_ref, FramePtr frame_cur) {
+  trackKlt(frame_ref, frame_cur, px_ref_, px_cur_, f_ref_, f_cur_, disparities_, px_pre_);
   SVO_INFO_STREAM("Init: KLT tracked "<< disparities_.size() <<" features");
 
   if(disparities_.size() < Config::initMinTracked())  // initMinTracked default is 50
@@ -104,13 +105,13 @@ void detectFeatures(
     vector<Vector3d>& f_vec) {
   Features new_features;
   feature_detection::FastDetector detector(
-      frame->img().cols, frame->img().rows, Config::gridSize(), Config::nPyrLevels());
+      frame->img().cols, frame->img().rows, Config::gridSize(), Config::nPyrLevels()); // default gridSize=30, nPyrLevels=3
   detector.detect(frame.get(), frame->img_pyr_, Config::triangMinCornerScore(), new_features);
 
   // now for all maximum corners, initialize a new seed
   px_vec.clear(); px_vec.reserve(new_features.size());
   f_vec.clear(); f_vec.reserve(new_features.size());
-  std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr){
+  std::for_each(new_features.begin(), new_features.end(), [&](Feature* ftr) {
     px_vec.push_back(cv::Point2f(ftr->px[0], ftr->px[1]));
     f_vec.push_back(ftr->f);    // f_vec is unit-bearing vector of the feature (Note: the 3d f_vec position on unit sphere, not on the Normalized plane )
     delete ftr;
@@ -124,7 +125,8 @@ void trackKlt(
     vector<cv::Point2f>& px_cur,
     vector<Vector3d>& f_ref,
     vector<Vector3d>& f_cur,
-    vector<double>& disparities) {
+    vector<double>& disparities,
+    vector<cv::Point2f>& px_pre) {
   const double klt_win_size = 30.0;   // size of search window
   const int klt_max_iter = 30;        // the maximum of iteratopms
   const double klt_eps = 0.001;       // the minimum change per iteration
@@ -133,13 +135,13 @@ void trackKlt(
   vector<float> min_eig_vec;          // no use
   cv::TermCriteria termcrit(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, klt_max_iter, klt_eps);    // how to the end
   cv::calcOpticalFlowPyrLK(frame_ref->img_pyr_[0], frame_cur->img_pyr_[0],
-                           px_ref, px_cur,
+                           px_pre, px_cur,
                            status, error,
                            cv::Size2i(klt_win_size, klt_win_size),
                            4, termcrit, cv::OPTFLOW_USE_INITIAL_FLOW);
 
   vector<cv::Point2f>::iterator px_ref_it = px_ref.begin();
-  vector<cv::Point2f>::iterator px_cur_it = px_cur.begin();
+  vector<cv::Point2f>::iterator px_cur_it = px_cur.begin();  
   vector<Vector3d>::iterator f_ref_it = f_ref.begin();
   f_cur.clear(); f_cur.reserve(px_cur.size());
   disparities.clear(); disparities.reserve(px_cur.size());
@@ -159,6 +161,8 @@ void trackKlt(
     ++px_cur_it;
     ++f_ref_it;
   }
+  
+  px_pre = px_cur;
 }
 
 void computeHomography(

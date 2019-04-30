@@ -38,12 +38,13 @@ public:
   KltHomographyInit() {};
   ~KltHomographyInit() {};
   InitResult addFirstFrame(FramePtr frame_ref);
-  InitResult addSecondFrame(FramePtr frame_ref);
+  InitResult addSecondFrame(FramePtr frame_ref, FramePtr frame_cur);
   void reset();
 
 protected:
   vector<cv::Point2f> px_ref_;      //!< keypoints to be tracked in reference frame.
   vector<cv::Point2f> px_cur_;      //!< tracked keypoints in current frame.
+  vector<cv::Point2f> px_pre_;      //!< keypoints to be tracked in previous frame.
   vector<Vector3d> f_ref_;          //!< bearing vectors corresponding to the keypoints in the reference image.
   vector<Vector3d> f_cur_;          //!< bearing vectors corresponding to the keypoints in the current image.
   vector<double> disparities_;      //!< disparity between first and second frame.
@@ -66,7 +67,8 @@ void trackKlt(
     vector<cv::Point2f>& px_cur,
     vector<Vector3d>& f_ref,
     vector<Vector3d>& f_cur,
-    vector<double>& disparities);
+    vector<double>& disparities,
+    vector<cv::Point2f>& px_pre);
 
 void computeHomography(
     const vector<Vector3d>& f_ref,

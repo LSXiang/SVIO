@@ -41,20 +41,20 @@ FrameHandlerMono::FrameHandlerMono(vk::AbstractCamera* cam) :
 
 void FrameHandlerMono::initialize()
 {
-    // create a fast feature detector use to feature point track
-    feature_detection::DetectorPtr feature_detector(
-        new feature_detection::FastDetector(
-            cam_->width(), cam_->height(), Config::gridSize(), Config::nPyrLevels()));
-    
-    /**
-     * boost::bind refer to https://www.boost.org/doc/libs/1_68_0/libs/bind/doc/html/bind.html
-     * using bind with pointers to members:
-     *      depth_filter_cb(_1, _2) => (&map_.point_candidates_)->newCandidatePoint(_1, _2)
-     */
-    DepthFilter::callback_t depth_filter_cb = boost::bind(
-        &MapPointCandidates::newCandidatePoint, &map_.point_candidates_, _1, _2);
-    depth_filter_ = new DepthFilter(feature_detector, depth_filter_cb);
-    depth_filter_->startThread();
+  // create a fast feature detector use to feature point track
+  feature_detection::DetectorPtr feature_detector(
+      new feature_detection::FastDetector(
+          cam_->width(), cam_->height(), Config::gridSize(), Config::nPyrLevels()));
+  
+  /**
+   * boost::bind refer to https://www.boost.org/doc/libs/1_68_0/libs/bind/doc/html/bind.html
+   * using bind with pointers to members:
+   *      depth_filter_cb(_1, _2) => (&map_.point_candidates_)->newCandidatePoint(_1, _2)
+   */
+  DepthFilter::callback_t depth_filter_cb = boost::bind(
+      &MapPointCandidates::newCandidatePoint, &map_.point_candidates_, _1, _2);
+  depth_filter_ = new DepthFilter(feature_detector, depth_filter_cb);
+  depth_filter_->startThread();
 }
 
 FrameHandlerMono::~FrameHandlerMono()
@@ -64,109 +64,108 @@ FrameHandlerMono::~FrameHandlerMono()
 
 void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 {
-    if (!startFrameProcessingCommon(timestamp))
-        return;
+  if (!startFrameProcessingCommon(timestamp))
+    return;
 
-    // some cleanup from last iteration, can't do before because of visualization
-    core_kfs_.clear();
-    overlap_kfs_.clear();
+  // some cleanup from last iteration, can't do before because of visualization
+  core_kfs_.clear();
+  overlap_kfs_.clear();
 
-    // create new frame
-    SVO_START_TIMER("pyramid_creation");
-    new_frame_.reset(new Frame(cam_, img.clone(), timestamp));
-    SVO_STOP_TIMER("pyramid_creation");
+  // create new frame
+  SVO_START_TIMER("pyramid_creation");
+  new_frame_.reset(new Frame(cam_, img.clone(), timestamp));
+  SVO_STOP_TIMER("pyramid_creation");
 
-    // process frame
-    UpdateResult res = RESULT_FAILURE;
-    if (stage_ == STAGE_DEFAULT_FRAME)
-        res = processFrame();
-    else if (stage_ == STAGE_SECOND_FRAME)
-        res = processSecondFrame();
-    else if (stage_ == STAGE_FIRST_FRAME)
-        res = processFirstFrame();
-    else if (stage_ == STAGE_RELOCALIZING)
-        res = relocalizeFrame(SE3(Matrix3d::Identity(), Vector3d::Zero()),
-                              map_.getClosestKeyframe(last_frame_));
+  // process frame
+  UpdateResult res = RESULT_FAILURE;
+  if (stage_ == STAGE_DEFAULT_FRAME)
+    res = processFrame();
+  else if (stage_ == STAGE_SECOND_FRAME)
+    res = processSecondFrame();
+  else if (stage_ == STAGE_FIRST_FRAME)
+    res = processFirstFrame();
+  else if (stage_ == STAGE_RELOCALIZING)
+    res = relocalizeFrame(SE3(Matrix3d::Identity(), Vector3d::Zero()),
+                          map_.getClosestKeyframe(last_frame_));
 
-    // set last frame
-    last_frame_ = new_frame_;
-    new_frame_.reset();
-    // finish processing
-    finishFrameProcessingCommon(last_frame_->id_, res, last_frame_->nObs());
+  // set last frame
+  last_frame_ = new_frame_;
+  new_frame_.reset();
+  // finish processing
+  finishFrameProcessingCommon(last_frame_->id_, res, last_frame_->nObs());
 }
 
 FrameHandlerMono::UpdateResult FrameHandlerMono::processFirstFrame()
 {
-    new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
-    
-    if (klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
-        return RESULT_NO_KEYFRAME;
-    
-    // Set is_keyframe_, but now does not set keyPoint(the reason is that the frame.fts_ is empty)
-    // So, in the processSecondFrame function, add call the frame setKeyPoints function 
-    new_frame_->setKeyframe();
-    map_.addKeyframe(new_frame_);
-    stage_ = STAGE_SECOND_FRAME;
-    SVO_INFO_STREAM("Init: Selected first frame.");
-    return RESULT_IS_KEYFRAME;
+  new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
+  
+  if (klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
+    return RESULT_NO_KEYFRAME;
+  
+  // Set is_keyframe_, but now does not set keyPoint(the reason is that the frame.fts_ is empty)
+  // So, in the processSecondFrame function, add call the frame setKeyPoints function 
+  new_frame_->setKeyframe();
+  map_.addKeyframe(new_frame_);
+  stage_ = STAGE_SECOND_FRAME;
+  SVO_INFO_STREAM("Init: Selected first frame.");
+  return RESULT_IS_KEYFRAME;
 }
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
 {
-    initialization::InitResult res = klt_homography_init_.addSecondFrame(new_frame_);
-    if(res == initialization::FAILURE)
-        return RESULT_FAILURE;
-    else if(res == initialization::NO_KEYFRAME)
-        return RESULT_NO_KEYFRAME;
+  initialization::InitResult res = klt_homography_init_.addSecondFrame(last_frame_, new_frame_);
+  if(res == initialization::FAILURE)
+    return RESULT_FAILURE;
+  else if(res == initialization::NO_KEYFRAME)
+    return RESULT_NO_KEYFRAME;
 
     // two-frame bundle adjustment
 #ifdef USE_BUNDLE_ADJUSTMENT
-    ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);  // lobaThresh default:2.0f
+  ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);  // lobaThresh default:2.0f
 #endif
 
-    map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
-    new_frame_->setKeyframe();
-    double depth_mean, depth_min;
-    frame_utils::getSceneDepth(*new_frame_, depth_mean, depth_min);
-    depth_filter_->addKeyframe(new_frame_, depth_mean, 0.5*depth_min);
+  map_.lastKeyframe().get()->setKeyPoints();  // Since the first frame does not add key points, it is added once here.
+  new_frame_->setKeyframe();
+  double depth_mean, depth_min;
+  frame_utils::getSceneDepth(*new_frame_, depth_mean, depth_min);
+  depth_filter_->addKeyframe(new_frame_, depth_mean, 0.5*depth_min);
 
-    // add frame to map
-    map_.addKeyframe(new_frame_);
-    stage_ = STAGE_DEFAULT_FRAME;
-    klt_homography_init_.reset();
-    SVO_INFO_STREAM("Init: Selected second frame, triangulated initial map.");
-    return RESULT_IS_KEYFRAME;
+  // add frame to map
+  map_.addKeyframe(new_frame_);
+  stage_ = STAGE_DEFAULT_FRAME;
+  klt_homography_init_.reset();
+  SVO_INFO_STREAM("Init: Selected second frame, triangulated initial map.");
+  return RESULT_IS_KEYFRAME;
 }
 
 FrameHandlerBase::UpdateResult FrameHandlerMono::processFrame()
 {
-    // Set initial pose TODO use prior
-    new_frame_->T_f_w_ = last_frame_->T_f_w_;
+  // Set initial pose TODO use prior
+  new_frame_->T_f_w_ = last_frame_->T_f_w_;
 
-    // sparse image align
-    SVO_START_TIMER("sparse_img_align");
-    SparseImgAlign img_align(Config::kltMaxLevel(), Config::kltMinLevel(),  // max & min default: 4, 2
-                             30, SparseImgAlign::GaussNewton, false, false);
-    size_t img_align_n_tracked = img_align.run(last_frame_, new_frame_);
-    SVO_STOP_TIMER("sparse_img_align");
-    SVO_LOG(img_align_n_tracked);
-    SVO_DEBUG_STREAM("Img Align:\t Tracked = " << img_align_n_tracked);
+  // sparse image align
+  SVO_START_TIMER("sparse_img_align");
+  SparseImgAlign img_align(Config::kltMaxLevel(), Config::kltMinLevel(),  // max & min default: 4, 2
+                           30, SparseImgAlign::GaussNewton, false, false);
+  size_t img_align_n_tracked = img_align.run(last_frame_, new_frame_);
+  SVO_STOP_TIMER("sparse_img_align");
+  SVO_LOG(img_align_n_tracked);
+  SVO_DEBUG_STREAM("Img Align:\t Tracked = " << img_align_n_tracked);
 
-    // map reprojection & feature alignment
-    SVO_START_TIMER("reproject");
-    reprojector_.reprojectMap(new_frame_, overlap_kfs_);
-    SVO_STOP_TIMER("reproject");
-    const size_t repr_n_new_references = reprojector_.n_matches_;
-    const size_t repr_n_mps = reprojector_.n_trials_;
-    SVO_LOG2(repr_n_mps, repr_n_new_references);
-    SVO_DEBUG_STREAM("Reprojection:\t nPoints = "<<repr_n_mps<<"\t \t nMatches = "<<repr_n_new_references);
-    if(repr_n_new_references < Config::qualityMinFts()) 
-    {
-        SVO_WARN_STREAM_THROTTLE(1.0, "Not enough matched features.");
-        new_frame_->T_f_w_ = last_frame_->T_f_w_; // reset to avoid crazy pose jumps
-        tracking_quality_ = TRACKING_INSUFFICIENT;
-        return RESULT_FAILURE;
-    }
+  // map reprojection & feature alignment
+  SVO_START_TIMER("reproject");
+  reprojector_.reprojectMap(new_frame_, overlap_kfs_);
+  SVO_STOP_TIMER("reproject");
+  const size_t repr_n_new_references = reprojector_.n_matches_;
+  const size_t repr_n_mps = reprojector_.n_trials_;
+  SVO_LOG2(repr_n_mps, repr_n_new_references);
+  SVO_DEBUG_STREAM("Reprojection:\t nPoints = "<<repr_n_mps<<"\t \t nMatches = "<<repr_n_new_references);
+  if (repr_n_new_references < Config::qualityMinFts()) {
+    SVO_WARN_STREAM_THROTTLE(1.0, "Not enough matched features.");
+    new_frame_->T_f_w_ = last_frame_->T_f_w_; // reset to avoid crazy pose jumps
+    tracking_quality_ = TRACKING_INSUFFICIENT;
+    return RESULT_FAILURE;
+  }
 
   // pose optimization
   SVO_START_TIMER("pose_optimizer");
