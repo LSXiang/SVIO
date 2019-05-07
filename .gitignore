@@ -1,4 +1,5 @@
 # Temporary Files
 *~
 *.kdev4
+*.idea
 CMakeLists.txt
