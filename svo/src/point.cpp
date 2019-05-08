@@ -78,6 +78,7 @@ bool Point::deleteFrameRef(Frame* frame)
     if((*it)->frame == frame)
     {
       obs_.erase(it);
+      --n_obs_;
       return true;
     }
   }
