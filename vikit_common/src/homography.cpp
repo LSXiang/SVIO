@@ -284,7 +284,7 @@ void Homography::findBestDecomposition() {
       Matrix3d Essential = T.rotation_matrix() * sqew(T.translation());
       double dSumError = 0;
       for (size_t m=0; m < fts_c1.size(); m++ ) {
-        double d = sampsonusError(fts_c1[m], Essential, fts_c2[m]);
+        double d = sampsonusError(fts_c1[m], Essential, fts_c2[m]); // calculate sampsonus error.
         if(d > dErrorSquaredLimit)
           d = dErrorSquaredLimit;
         dSumError += d;

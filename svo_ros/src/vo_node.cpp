@@ -155,26 +155,26 @@ void VoNode::remoteKeyCb(const std_msgs::StringConstPtr& key_input)
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "svo");
-    ros::NodeHandle nh;
-    std::cout << "create vo_node" << std::endl;
-    svo::VoNode vo_node;
+  ros::init(argc, argv, "svo");
+  ros::NodeHandle nh;
+  std::cout << "create vo_node" << std::endl;
+  svo::VoNode vo_node;
 
-    // subscribe to cam msgs
-    std::string cam_topic(vk::getParam<std::string>("svo/cam_topic", "camera/image_raw"));
-    image_transport::ImageTransport it(nh);
-    image_transport::Subscriber it_sub = it.subscribe(cam_topic, 5, &svo::VoNode::imgCb, &vo_node);
+  // subscribe to cam msgs
+  std::string cam_topic(vk::getParam<std::string>("svo/cam_topic", "camera/image_raw"));
+  image_transport::ImageTransport it(nh);
+  image_transport::Subscriber it_sub = it.subscribe(cam_topic, 5, &svo::VoNode::imgCb, &vo_node);
 
-    // subscribe to remote input
-    vo_node.sub_remote_key_ = nh.subscribe("svo/remote_key", 5, &svo::VoNode::remoteKeyCb, &vo_node);
+  // subscribe to remote input
+  vo_node.sub_remote_key_ = nh.subscribe("svo/remote_key", 5, &svo::VoNode::remoteKeyCb, &vo_node);
 
-    // start processing callbacks
-    while(ros::ok() && !vo_node.quit_)
-    {
-        ros::spinOnce();
-        // TODO check when last image was processed. when too long ago. publish warning that no msgs are received!
-    }
+  // start processing callbacks
+  while(ros::ok() && !vo_node.quit_)
+  {
+    ros::spinOnce();
+    // TODO check when last image was processed. when too long ago. publish warning that no msgs are received!
+  }
 
-    printf("SVO terminated.\n");
-    return 0;
+  printf("SVO terminated.\n");
+  return 0;
 }

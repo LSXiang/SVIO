@@ -119,7 +119,7 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processSecondFrame()
   else if(res == initialization::NO_KEYFRAME)
     return RESULT_NO_KEYFRAME;
 
-    // two-frame bundle adjustment
+  // two-frame bundle adjustment
 #ifdef USE_BUNDLE_ADJUSTMENT
   ba::twoViewBA(new_frame_.get(), map_.lastKeyframe().get(), Config::lobaThresh(), &map_);  // lobaThresh default:2.0f
 #endif
