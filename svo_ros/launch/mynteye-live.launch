@@ -1,5 +1,5 @@
 <launch>
-  
+
   <node pkg="svo_ros" type="vo" name="svo" clear_params="true" output="screen">
   
     <!-- Camera topic to subscribe to -->
@@ -12,5 +12,9 @@
     <rosparam file="$(find svo_ros)/param/vo_fast.yaml" />
 
   </node>
+
+<!--  <node pkg="rqt_svo" type="rqt_svo" name="rqt_svo" />-->
+  
+  <node pkg="rviz" type="rviz" name="odometry_rviz" args="-d $(find svo_ros)/rviz_config.rviz"/>
         
 </launch>
